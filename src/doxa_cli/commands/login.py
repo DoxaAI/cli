@@ -1,50 +1,12 @@
 import datetime
-import json
 import time
 import webbrowser
 
 import click
 import requests
-from doxa_cli.constants import CLIENT_ID, LOGIN_URL, SCOPE, TOKEN_URL
+from doxa_cli.constants import CLIENT_ID, LOGIN_URL, SCOPE, SPINNER, TOKEN_URL
 from doxa_cli.utils import update_doxa_config
 from halo import Halo
-
-SPINNER = {
-		"interval": 80,
-		"frames": [
-			"▐⠂       ▌",
-			"▐⠈       ▌",
-			"▐ ⠂      ▌",
-			"▐ ⠠      ▌",
-			"▐  ⡀     ▌",
-			"▐  ⠠     ▌",
-			"▐   ⠂    ▌",
-			"▐   ⠈    ▌",
-			"▐    ⠂   ▌",
-			"▐    ⠠   ▌",
-			"▐     ⡀  ▌",
-			"▐     ⠠  ▌",
-			"▐      ⠂ ▌",
-			"▐      ⠈ ▌",
-			"▐       ⠂▌",
-			"▐       ⠠▌",
-			"▐       ⡀▌",
-			"▐      ⠠ ▌",
-			"▐      ⠂ ▌",
-			"▐     ⠈  ▌",
-			"▐     ⠂  ▌",
-			"▐    ⠠   ▌",
-			"▐    ⡀   ▌",
-			"▐   ⠠    ▌",
-			"▐   ⠂    ▌",
-			"▐  ⠈     ▌",
-			"▐  ⠂     ▌",
-			"▐ ⠠      ▌",
-			"▐ ⡀      ▌",
-			"▐⠠       ▌"
-		]
-	}
-
 
 
 def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime):
@@ -79,20 +41,30 @@ def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime
             break
 
 
+def get_device_code():
+    result = requests.post(
+        LOGIN_URL, data={"client_id": CLIENT_ID, "scope": SCOPE}, verify=True
+    ).json()
+
+    assert "device_code" in result
+    assert "interval" in result
+    assert "verification_uri_complete" in result
+
+    return result
+
+
 @click.command()
 def login():
     """Log in with your DOXA account."""
 
     now = datetime.datetime.now()
-    r = requests.post(
-        LOGIN_URL, data={"client_id": CLIENT_ID, "scope": SCOPE}, verify=True
-    )
-    get_device_time = now + r.elapsed
 
-    data = json.loads(r.text)
-    device_code = data["device_code"]
-    interval = data["interval"]
-    expires_in = datetime.timedelta(0, data["expires_in"])
+    try:
+        data = get_device_code()
+    except:
+        click.secho("\nAn error occurred while initiating the authorisation process. Please try again later.", fg="red", bold=True)
+        return
+
     click.secho(
         "\nUse the link below to log into the CLI using your DOXA account:",
         fg="green",
@@ -110,8 +82,10 @@ def login():
     except:
         click.secho("\n")
 
+    expires_at = now + datetime.timedelta(seconds=data["expires_in"])
+
     with Halo(text='Waiting for approval', spinner=SPINNER, enabled=True) as spinner:
-        for (state, result) in wait_for_auth(device_code, interval, get_device_time + expires_in):
+        for (state, result) in wait_for_auth(data["device_code"], data["interval"], expires_at):
             if state == "PENDING":
                 continue
 
@@ -129,7 +103,7 @@ def login():
                         expires_at=datetime.datetime.now()
                         + datetime.timedelta(seconds=result["expires_in"]),
                     )
-                    spinner.succeed("Authorisation successful - you are now logged in!")
+                    spinner.succeed("Authorisation successful - you have now been logged in!")
                 except:
                     spinner.fail("A CLI error occurred while logging you in.")
             else:

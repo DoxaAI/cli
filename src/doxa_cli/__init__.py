@@ -2,6 +2,7 @@ import click
 
 from doxa_cli.commands.login import login
 from doxa_cli.commands.logout import logout
+from doxa_cli.commands.surprise import surprise
 from doxa_cli.commands.upload import upload
 from doxa_cli.commands.user import user
 
@@ -19,6 +20,7 @@ main.add_command(login)
 main.add_command(logout)
 main.add_command(user)
 main.add_command(upload)
+main.add_command(surprise)
 
 
 if __name__ == "__main__":
