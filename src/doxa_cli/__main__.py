@@ -1,86 +1,123 @@
+import datetime
+import os
+import time
+import webbrowser
+
 import click
+import requests
+import json
+from termcolor import colored
 
-
-@click.command()
-def main():
-    """The DOXA CLI is the primary tool for uploading agents to DOXA."""
-
-    # Fancy welcome message!
-
-    click.secho("Hello, world!", bold=True, fg="green")
+login_url = 'https://doxaai.com/api/oauth/device/code'
+token_url = 'https://doxaai.com/api/oauth/token'
+client_id = 'eb594ca3-023d-477f-823a-22e48f4e5235'
+scope = 'basic'
+token_path = "~/.doxa"
 
 
 @click.command()
 def login():
     """Log in with your DOXA account."""
 
-    # Step 1: POST https://doxaai.com/api/oauth/device/code
+    now = datetime.datetime.now()
+    r = requests.post(login_url, data={"client_id": client_id, "scope": scope}, verify=True)
+    get_device_time = now + r.elapsed
+    expire = 0
 
-    # Request:
-    # {
-    #     "client_id": "eb594ca3-023d-477f-823a-22e48f4e5235",
-    #     "scope": "basic"
-    # }
+    data = json.loads(r.text)
+    device_code = data['device_code']
+    interval = data['interval']
+    expire = datetime.timedelta(0,data['expires_in'])
+    click.secho("Use the link below to login and authorize your device in Doxa website:")
+    click.secho(data['verification_uri_complete'])
+    webbrowser.open(data['verification_uri_complete'], 2, False)
 
-    # Response:
-    # {
-    #     "device_code": "UUID",
-    #     "user_code": "{user_code}",
-    #     "expires_in": 900,
-    #     "interval": 5,
-    #     "verification_uri": "https://doxaai.com/oauth/device",
-    #     "verification_uri_complete": "https://doxaai.com/oauth/device/{user_code}"
-    # }
+    grant = "device_code"
+    access_time = 0.0
 
-    # Step 2: display `verification_uri_complete` and automatically open
-    #         the URL in their browser using the webbrowser module
+    while True:
+        if datetime.datetime.now()<get_device_time+expire:
+            try:
+                now = datetime.datetime.now()
+                r = requests.post(token_url,
+                                  data={"grant_type": grant, "client_id": client_id, "device_code": device_code}, verify=True)
 
-    # while the user is authorising the CLI, show a fun spinner!
+                if "error" in r.text:
+                    click.secho("[INFO] Authorization Pending...")
 
-    # Step 3: POST https://doxaai.com/api/oauth/token
-    #         we want to poll this endpoint every {interval} seconds no longer
-    #         than for {expires_in} seconds
+                else:
+                    access_time = now + r.elapsed
+                    click.secho(colored("[INFO] Authorization Succesful!", 'yellow'))
 
-    # Request:
-    # {
-    #     "grant_type": "device_code",
-    #     "client_id": "eb594ca3-023d-477f-823a-22e48f4e5235",
-    #     "device_code": "{device_code from the previous request}"
-    # }
+                    token = json.loads(r.text)
 
-    # Response (while the user has not yet authorised the CLI application):
-    # { "error": { "code": "authorization_pending" } }
+                    access_token = token['access_token']
+                    refresh_token = token['refresh_token']
+                    token_type = token['token_type']
+                    expires_in = datetime.timedelta(0,token['expires_in'])
 
-    # Response (when the user has authorised the CLI application):
-    # {
-    #     "access_token": "{access_token}",
-    #     "expires_in": 86400,
-    #     "refresh_token": "{refresh_token}",
-    #     "token_type": "Bearer"
-    # }
-    # in the future, there will also be an id_token we will want to handle!
+                    if not os.path.exists(token_path):
+                        os.makedirs(token_path)
+                    with open(os.path.join(token_path,"config.json"), "w") as f:
+                        json.dump({'access_token': access_token, 'refresh_token': refresh_token, 'expire':access_time+ expires_in}, f, default = str)
+                    break
+            except ValueError:
+                click.secho("[ERROR] Something Went Wrong!")
 
-    # Step 4: Store the access_token and refresh_token in ~/.doxa/config.json
+            time.sleep(interval)
+        else:
+            click.secho("Device code expired. Please try login command again.")
+            break
 
-    click.secho("TODO", bold=True, fg="green")
+def getNewestToken():
+    grant = "refresh_token"
 
+    if not os.path.exists(token_path):
+        os.makedirs(token_path)
+
+    with open(os.path.join(token_path,"config.json"), 'r') as f:
+        data = json.load(f)
+
+    if datetime.datetime.now()<datetime.datetime.strptime(data['expire'], '%Y-%m-%d %H:%M:%S.%f'):
+        return data['access_token']
+    else:
+        now = datetime.datetime.now()
+        r = requests.post(token_url, data={"grant_type": grant, "refresh_token": data["refresh_token"]}, verify=True)
+        access_time = r.elapsed
+        token = json.loads(r.text)
+        access_token = token['access_token']
+        refresh_token = token['refresh_token']
+        token_type = token['token_type']
+        expires_in = datetime.timedelta(0,token['expires_in'])
+
+        with open(os.path.join(token_path,"config.json"), "w") as f:
+            json.dump(
+                {'access_token': access_token, 'refresh_token': refresh_token, 'expire': access_time + expires_in}, f, default = str)
+        return token['access_token']
 
 @click.command()
 def logout():
     """Log out of your DOXA account."""
-
-    # clear the values from ~/.doxa/config.json
-
-    click.secho("TODO", bold=True, fg="green")
-
+    click.secho("Start to clear config file!")
+    os.remove(os.path.join(token_path,"config.json"))
+    os.rmdir(token_path)
+    #open(os.path.join(token_path,"config.json"), 'w').close()
+    click.secho("GoodBye!")
 
 @click.command()
 def user():
     """Display information on the currently logged in user."""
+    user_url = "https://doxaai.com/api/oauth/user"
+    headers = {"Authorization": 'Bearer %s' % getNewestToken()}
 
-    # Step 1: GET https://doxaai.com/api/oauth/user
-    # Headers:
-    # - Authorization: Bearer {access_token}
+    r = requests.post(user_url, headers=headers, verify=True)
+    data = json.loads(r.text)["user"]
+
+    click.secho("Hello, you are currently logged in as %s with email %s!"%(data["username"],data["email"]))
+    if data["admin"]:
+        click.secho("[You are an admin.]",fg="blue")
+    diff = datetime.datetime.now(datetime.timezone.utc)-datetime.datetime.strptime(data["created_at"], '%Y-%m-%dT%H:%M:%S.%f%z')
+    click.secho("You created your account %s days ago."%str(diff.days))
 
     # Response:
     # {
@@ -96,9 +133,13 @@ def user():
     #     }
     # }
 
-    # Step 2: print it out prettily (with colour!)
 
-    click.secho("TODO", bold=True, fg="green")
+@click.command()
+def main():
+    """The DOXA CLI is the primary tool for uploading agents to DOXA."""
+
+    click.secho("Hi! Welcome to the Doxa Cli service!", bold=True, fg="green")
+
 
 
 @click.command()
