@@ -18,6 +18,7 @@ def read_doxa_config() -> dict:
 
 
 def update_doxa_config(**kwargs) -> None:
+    os.makedirs(CONFIG_DIRECTORY, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(kwargs, f, default=str)
 
