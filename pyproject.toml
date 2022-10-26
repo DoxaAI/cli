@@ -17,6 +17,9 @@ dependencies = [
   "click >= 8.1.3"
 ]
 
+[project.scripts]
+doxa = "doxa_cli:main"
+
 [project.urls]
 "Homepage" = "https://github.com/DoxaAI/cli"
 "Bug Tracker" = "https://github.com/DoxaAI/cli/issues"
