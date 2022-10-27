@@ -9,7 +9,8 @@ USER_URL = f"{DOXA_BASE_URL}/api/oauth/user"
 
 CLIENT_ID = "eb594ca3-023d-477f-823a-22e48f4e5235"
 SCOPE = "basic"
-CONFIG_DIRECTORY = os.path.join(Path.home(), ".doxa")
+
+CONFIG_DIRECTORY = os.environ.get("DOXA_CONFIG_DIRECTORY", os.path.join(Path.home(), ".doxa"))
 CONFIG_PATH = os.path.join(CONFIG_DIRECTORY, "config.json")
 
 SPINNER = {
