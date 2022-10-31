@@ -31,7 +31,10 @@ def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime
             break
 
         if "error" in res:
-            if "code" in res["error"] and res["error"]["code"] == "authorization_pending":
+            if (
+                "code" in res["error"]
+                and res["error"]["code"] == "authorization_pending"
+            ):
                 yield "PENDING", None
                 time.sleep(interval)
             else:
@@ -62,7 +65,11 @@ def login():
     try:
         data = get_device_code()
     except:
-        click.secho("\nAn error occurred while initiating the authorisation process. Please try again later.", fg="red", bold=True)
+        click.secho(
+            "\nAn error occurred while initiating the authorisation process. Please try again later.",
+            fg="red",
+            bold=True,
+        )
         return
 
     click.secho(
@@ -84,13 +91,17 @@ def login():
 
     expires_at = now + datetime.timedelta(seconds=data["expires_in"])
 
-    with Halo(text='Waiting for approval', spinner=SPINNER, enabled=True) as spinner:
-        for (state, result) in wait_for_auth(data["device_code"], data["interval"], expires_at):
+    with Halo(text="Waiting for approval", spinner=SPINNER, enabled=True) as spinner:
+        for (state, result) in wait_for_auth(
+            data["device_code"], data["interval"], expires_at
+        ):
             if state == "PENDING":
                 continue
 
             if state == "EXPIRED":
-                spinner.fail("The authorisation request has expired. Please rerun this command and try logging in again.")
+                spinner.fail(
+                    "The authorisation request has expired. Please rerun this command and try logging in again."
+                )
             elif state == "ERROR":
                 spinner.fail("A CLI error occurred during the authorisation process.")
             elif state == "AUTH_ERROR":
@@ -103,7 +114,9 @@ def login():
                         expires_at=datetime.datetime.now()
                         + datetime.timedelta(seconds=result["expires_in"]),
                     )
-                    spinner.succeed("Authorisation successful - you have now been logged in!")
+                    spinner.succeed(
+                        "Authorisation successful - you have now been logged in!"
+                    )
                 except:
                     spinner.fail("A CLI error occurred while logging you in.")
             else:

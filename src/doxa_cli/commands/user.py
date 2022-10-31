@@ -13,7 +13,10 @@ from doxa_cli.utils import (
 
 
 def print_line(key: str, value: str):
-    click.echo(click.style(f"{key + ':':<20}", fg="cyan", bold=True) + click.style(value, bold=True))
+    click.echo(
+        click.style(f"{key + ':':<20}", fg="cyan", bold=True)
+        + click.style(value, bold=True)
+    )
 
 
 @click.command()
@@ -108,7 +111,11 @@ def user(extra):
         print_line("Updated at", data["updated_at"])
 
     if data.get("admin", False):
-        click.secho("\nYou are an admin. With great power comes great responsibility.", fg="blue", bold=True)
+        click.secho(
+            "\nYou are an admin. With great power comes great responsibility.",
+            fg="blue",
+            bold=True,
+        )
 
     diff = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.strptime(
         data["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
