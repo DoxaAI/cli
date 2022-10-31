@@ -28,7 +28,7 @@ doxa login
 
 If supported, this will open an authorisation prompt in your default browser. If you are not already logged in on [doxaai.com](https://doxaai.com/), you will first be invited to do so. Thereafter, you wil be asked to authorise the DOXA CLI to have access to your DOXA account. Once you signify your approval, the DOXA CLI will automatically log you in within a few seconds.
 
-By default, the DOXA CLI will store its configuration within `~/.doxa`, where `~` is your home directory, e.g. `/home/username` on Linux systems and `C:\Users\username\` on Windows. If for whatever reason you would like to store the DOXA CLI configuration elsewhere (e.g. due to a permissions issue), you may use a different directory by setting the `DOXA_CONFIG_DIRECTORY` environment variable.
+By default, the DOXA CLI will store its configuration in a location that follows the norm for your operating system (e.g. within `%APPDATA%\doxa\doxa` on Windows, `~/Library/Application Support/doxa` on macOS and `~/.config/doxa` on Linux). You can find this location by running `doxa config`. If for whatever reason you would like to store the DOXA CLI configuration elsewhere (e.g. due to a permissions issue), you may use a different directory by setting the `DOXA_CONFIG_DIRECTORY` environment variable.
 
 ### Logging out
 
