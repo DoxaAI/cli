@@ -1,13 +1,27 @@
 import click
 from doxa_cli.constants import CONFIG_PATH, DOXA_BASE_URL
-from doxa_cli.utils import clear_doxa_config
+from doxa_cli.utils import clear_doxa_config, print_line, read_doxa_config, show_error
 
 
 @click.command(hidden=True)
-@click.option("--reset", default=False, is_flag=True)
-def config(reset):
-    click.echo(f"\n{click.style('DOXA PATH:', fg='cyan', bold=True)} {DOXA_BASE_URL}")
-    click.echo(f"\n{click.style('CONFIG PATH:', fg='cyan', bold=True)} {CONFIG_PATH}")
+@click.option("--reset", "-r", default=False, is_flag=True)
+@click.option("--debug", "-d", default=False, is_flag=True)
+def config(reset, debug):
+
+    print_line("\nDOXA base URL", DOXA_BASE_URL)
+    print_line("\nConfiguration path", CONFIG_PATH)
+
+    if debug:
+        try:
+            config = read_doxa_config()
+
+            print_line("\nAccess token", config.get("access_token"))
+            print_line("\nAccess token (expiry)", config.get("expires_at"))
+            print_line("\nRefresh token", config.get("refresh_token"))
+        except FileNotFoundError:
+            show_error("Oops, your configuration file could not be read.")
+        except:
+            show_error("\nSorry, no debug information is available!")
 
     if reset:
         try:
@@ -24,8 +38,6 @@ def config(reset):
                 bold=True,
             )
         except:
-            click.secho(
-                "\nThe DOXA CLI was unable to reset its configuration. Please delete the file manually.",
-                fg="red",
-                bold=True,
+            show_error(
+                "\nThe DOXA CLI was unable to reset its configuration. Please delete the file manually."
             )

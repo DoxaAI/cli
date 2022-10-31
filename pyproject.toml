@@ -1,6 +1,6 @@
 [project]
 name = "doxa-cli"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name="Jeremy Lo Ying Ping", email="jeremyloyingping@gmail.com" },
 ]
@@ -17,7 +17,9 @@ dependencies = [
   "click ~= 8.1.3",
   "halo ~= 0.0.31, >= 0.0.31",
   "requests ~= 2.26.0",
-  "appdirs >= 1.4.4"
+  "requests_toolbelt ~= 0.10.1",
+  "appdirs >= 1.4.4",
+  "pyyaml >= 6.0"
 ]
 
 [project.scripts]

@@ -4,14 +4,17 @@ import json
 import click
 import requests
 from doxa_cli.constants import USER_URL
-from doxa_cli.utils import get_access_token
-
-
-def print_line(key: str, value: str):
-    click.echo(
-        click.style(f"{key + ':':<20}", fg="cyan", bold=True)
-        + click.style(value, bold=True)
-    )
+from doxa_cli.errors import (
+    BrokenConfigurationError,
+    LoggedOutError,
+    SessionExpiredError,
+)
+from doxa_cli.utils import (
+    get_access_token,
+    print_line,
+    show_error,
+    try_to_fix_broken_config,
+)
 
 
 @click.command()
@@ -19,20 +22,39 @@ def print_line(key: str, value: str):
 def user(extra):
     """Display DOXA account information. You must be logged in."""
 
-    session_stop, access_token = get_access_token()
-    if session_stop:
+    try:
+        access_token = get_access_token()
+    except LoggedOutError:
+        click.secho(
+            "\nYou must be logged in to show user information.", fg="cyan", bold=True
+        )
+        return
+    except BrokenConfigurationError:
+        click.secho(
+            "\nOops, the DOXA CLI configuration file could not be read properly.\n",
+            fg="yellow",
+            bold=True,
+        )
+        try_to_fix_broken_config()
+        return
+    except SessionExpiredError:
+        click.secho(
+            "\nYour session has expired. Please log in again.",
+            fg="yellow",
+            bold=True,
+        )
+        return
+    except:
+        show_error("\nAn error occurred while performing this command.")
         return
 
-    headers = {"Authorization": f"Bearer {access_token}"}
-
     try:
-        r = requests.post(USER_URL, headers=headers, verify=True)
-        data = json.loads(r.text)["user"]
+        data = requests.post(
+            USER_URL, headers={"Authorization": f"Bearer {access_token}"}, verify=True
+        ).json()["user"]
     except:
-        click.secho(
-            "Oops, your user information could not be fetched at this time. You might wish to try logging in again.",
-            fg="red",
-            bold=True,
+        show_error(
+            "Oops, your user information could not be fetched at this time. You might wish to try logging in again."
         )
         return
 
@@ -79,5 +101,3 @@ def user(extra):
     click.secho(
         f"\nYou created your account {diff.days} days ago.", fg="green", bold=True
     )
-
-

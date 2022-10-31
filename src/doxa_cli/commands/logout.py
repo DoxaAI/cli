@@ -1,5 +1,5 @@
 import click
-from doxa_cli.utils import clear_doxa_config
+from doxa_cli.utils import clear_doxa_config, show_error
 
 
 @click.command()
@@ -11,6 +11,6 @@ def logout():
     except FileNotFoundError:
         pass
     except:
-        click.secho("\nAn error occurred while logging you out.", fg="red", bold=True)
+        show_error("\nAn error occurred while logging you out.")
 
     click.secho("\nGoodbye!", fg="cyan", bold=True)
