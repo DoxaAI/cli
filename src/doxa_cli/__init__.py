@@ -1,5 +1,6 @@
 import click
 
+from doxa_cli.commands.config import config
 from doxa_cli.commands.login import login
 from doxa_cli.commands.logout import logout
 from doxa_cli.commands.surprise import surprise
@@ -16,11 +17,12 @@ def main(ctx):
         click.secho("Hi! Welcome to the DOXA CLI!", bold=True, fg="green")
 
 
+main.add_command(config)
 main.add_command(login)
 main.add_command(logout)
-main.add_command(user)
-main.add_command(upload)
 main.add_command(surprise)
+main.add_command(upload)
+main.add_command(user)
 
 
 if __name__ == "__main__":
