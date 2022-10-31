@@ -1,13 +1,19 @@
 import datetime
 import json
 import os
-
-import requests
-import click
-import yaml
 import tarfile
+import typing
 
-from doxa_cli.constants import CONFIG_DIRECTORY, CONFIG_PATH, TOKEN_URL, UPLOAD_FILE, UPLOAD_FILE
+import click
+import requests
+import yaml
+
+from doxa_cli.constants import CONFIG_DIRECTORY, CONFIG_PATH, DOXA_YAML, TOKEN_URL
+from doxa_cli.errors import (
+    BrokenConfigurationError,
+    LoggedOutError,
+    SessionExpiredError,
+)
 
 
 def read_doxa_config() -> dict:
@@ -31,13 +37,13 @@ def clear_doxa_config() -> None:
     os.rmdir(CONFIG_DIRECTORY)
 
 
-def is_refresh_required(expires_at):
+def is_refresh_required(expires_at) -> bool:
     return datetime.datetime.now() >= datetime.datetime.strptime(
         expires_at, "%Y-%m-%d %H:%M:%S.%f"
     )
 
 
-def refresh_oauth_token(data):
+def refresh_oauth_token(data) -> str:
     now = datetime.datetime.now()
     r = requests.post(
         TOKEN_URL,
@@ -62,68 +68,61 @@ def refresh_oauth_token(data):
         )
     return token["access_token"]
 
-def get_access_token():
-    session_stop = True
-    access_token = None
 
+def try_to_fix_broken_config() -> None:
+    try:
+        clear_doxa_config()
+        click.secho("Please log in again to fix this issue.", fg="green", bold=True)
+    except:
+        show_error("The DOXA CLI was unable to reset its configuration.\n")
+        click.echo(
+            f"Please manually delete the file at the following path: {CONFIG_PATH}."
+        )
+
+
+def get_access_token() -> None:
     try:
         config = read_doxa_config()
     except FileNotFoundError:
-        click.secho(
-            "\nYou must be logged in to show user information.", fg="cyan", bold=True
-        )
-        return (session_stop, access_token)
-
+        raise LoggedOutError
     except (ValueError, AssertionError):
         # oops, the config is corrupted!
-        click.secho(
-            "\nOops, the DOXA CLI configuration file could not be read properly.\n",
-            fg="yellow",
-            bold=True,
-        )
-
-        try:
-            clear_doxa_config()
-            click.secho("Please log in again to fix this issue.", fg="green", bold=True)
-        except:
-            click.secho(
-                "The DOXA CLI was unable to reset its configuration.\n",
-                fg="red",
-                bold=True,
-            )
-            click.secho(
-                f"Please manually delete the file at the following path: {CONFIG_PATH}."
-            )
-
-            return (session_stop, access_token)
+        raise BrokenConfigurationError
 
     if is_refresh_required(config["expires_at"]):
         try:
-            access_token = refresh_oauth_token()
+            return refresh_oauth_token()
         except:
-            click.secho(
-                "\nYour session has expired. Please log in again.",
-                fg="yellow",
-                bold=True,
-            )
-            return (session_stop, access_token)
-    else:
-        access_token = config["access_token"]
-        session_stop = False
-        return (session_stop, access_token)
+            raise SessionExpiredError
 
-def read_doxa_upload(directory) -> dict:
-    path = os.path.join(directory, UPLOAD_FILE)
-    with open(path, 'r') as file:
-        config = yaml.safe_load (file)
+    return config["access_token"]
 
-        #assert "competition" in config
-        #assert "environment" in config
 
-        return config
+def read_doxa_yaml(directory: str) -> dict:
+    path = os.path.join(directory, DOXA_YAML)
+    with open(path, "r") as file:
+        return yaml.safe_load(file)
 
-def compress_agent_dir(directory) -> None:
-    print("compressing the agent directory")
-    #path = os.path.join("upload.tar", UPLOAD_FILE)
-    file = tarfile.open("directory", "w")
-    file.close()
+
+def compress_submission_directory(f: typing.IO, directory: str) -> None:
+    def reset(tarinfo):
+        tarinfo.uid = tarinfo.gid = 0
+        tarinfo.uname = tarinfo.gname = "root"
+        return tarinfo
+
+    with tarfile.open(fileobj=f, mode="x:gz", format=tarfile.GNU_FORMAT) as tar:
+        for file_name in os.listdir(directory):
+            tar.add(os.path.join(directory, file_name), arcname=file_name, filter=reset)
+
+    f.close()
+
+
+def show_error(message: str, color: str = "red") -> None:
+    click.secho(message, fg=color, bold=True)
+
+
+def print_line(key: str, value: str) -> None:
+    click.echo(
+        click.style(f"{key + ':':<24}", fg="cyan", bold=True)
+        + click.style(value, bold=True)
+    )

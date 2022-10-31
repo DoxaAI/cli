@@ -5,7 +5,7 @@ import webbrowser
 import click
 import requests
 from doxa_cli.constants import CLIENT_ID, LOGIN_URL, SCOPE, SPINNER, TOKEN_URL
-from doxa_cli.utils import update_doxa_config
+from doxa_cli.utils import show_error, update_doxa_config
 from halo import Halo
 
 
@@ -65,10 +65,8 @@ def login():
     try:
         data = get_device_code()
     except:
-        click.secho(
-            "\nAn error occurred while initiating the authorisation process. Please try again later.",
-            fg="red",
-            bold=True,
+        show_error(
+            "\nAn error occurred while initiating the authorisation process. Please try again later."
         )
         return
 
