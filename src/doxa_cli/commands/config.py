@@ -1,5 +1,8 @@
+import os
+
 import click
-from doxa_cli.constants import CONFIG_PATH, DOXA_BASE_URL
+
+from doxa_cli.constants import CONFIG_PATH, DOXA_BASE_URL, DOXA_STORAGE_OVERRIDE_URL
 from doxa_cli.utils import clear_doxa_config, print_line, read_doxa_config, show_error
 
 
@@ -9,6 +12,10 @@ from doxa_cli.utils import clear_doxa_config, print_line, read_doxa_config, show
 def config(reset, debug):
 
     print_line("\nDOXA base URL", DOXA_BASE_URL)
+
+    if DOXA_STORAGE_OVERRIDE_URL:
+        print_line("\nDOXA storage override URL", DOXA_STORAGE_OVERRIDE_URL)
+
     print_line("\nConfiguration path", CONFIG_PATH)
 
     if debug:

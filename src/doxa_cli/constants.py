@@ -6,6 +6,7 @@ import appdirs
 VERSION = "0.1"
 
 DOXA_BASE_URL = os.environ.get("DOXA_BASE_URL", "https://doxaai.com")
+DOXA_STORAGE_OVERRIDE_URL = os.environ.get("DOXA_STORAGE_OVERRIDE_URL")
 
 LOGIN_URL = f"{DOXA_BASE_URL}/api/oauth/device/code"
 TOKEN_URL = f"{DOXA_BASE_URL}/api/oauth/token"

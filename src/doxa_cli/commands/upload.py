@@ -5,9 +5,13 @@ from urllib.parse import urljoin
 
 import click
 import requests
+from halo import Halo
+from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
+
 from doxa_cli.constants import (
     BOUNCING_BAR,
     COMPETITION_KEY,
+    DOXA_STORAGE_OVERRIDE_URL,
     ENVIRONMENT_KEY,
     UPLOAD_SLOT_URL,
 )
@@ -25,8 +29,6 @@ from doxa_cli.utils import (
     show_error,
     try_to_fix_broken_config,
 )
-from halo import Halo
-from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
 
 @click.command()
@@ -122,13 +124,16 @@ def upload(directory, competition, environment):
             access_token, competition, environment, user_config
         )
 
-        upload_endpoint = urljoin(upload_slot["endpoint"], "upload")
+        upload_endpoint = urljoin(
+            DOXA_STORAGE_OVERRIDE_URL or upload_slot["endpoint"], "upload"
+        )
         upload_token = upload_slot["token"]
     except UploadSlotDeniedError as e:
         if e.doxa_error_code in (
             "INVALID_COMPETITION_TAG",
             "INVALID_ENVIRONMENT_TAG",
             "COMPETITION_NOT_FOUND",
+            "COMPETITION_CLOSED",
             "ENROLMENT_NOT_FOUND",
             "ENVIRONMENT_NOT_FOUND",
             "STORAGE_NODE_NOT_FOUND",
@@ -202,7 +207,7 @@ def upload(directory, competition, environment):
                 else:
                     raise UploadError
     except:
-        show_error("Oops, there was an error uploading your submission to DOXA.")
+        show_error("\nOops, there was an error uploading your submission to DOXA.")
         return
     finally:
         os.unlink(temporary_file.name)

@@ -123,6 +123,6 @@ def show_error(message: str, color: str = "red") -> None:
 
 def print_line(key: str, value: str) -> None:
     click.echo(
-        click.style(f"{key + ':':<24}", fg="cyan", bold=True)
+        click.style(f"{key + ': ':<32}", fg="cyan", bold=True)
         + click.style(value, bold=True)
     )
