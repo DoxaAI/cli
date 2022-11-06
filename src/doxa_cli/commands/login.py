@@ -1,12 +1,14 @@
 import datetime
+import sys
 import time
 import webbrowser
 
 import click
 import requests
+from halo import Halo
+
 from doxa_cli.constants import CLIENT_ID, LOGIN_URL, SCOPE, SPINNER, TOKEN_URL
 from doxa_cli.utils import show_error, update_doxa_config
-from halo import Halo
 
 
 def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime):
@@ -68,7 +70,7 @@ def login():
         show_error(
             "\nAn error occurred while initiating the authorisation process. Please try again later."
         )
-        return
+        sys.exit(1)
 
     click.secho(
         "\nUse the link below to log into the CLI using your DOXA account:",

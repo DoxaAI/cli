@@ -1,8 +1,10 @@
 import datetime
 import json
+import sys
 
 import click
 import requests
+
 from doxa_cli.constants import USER_URL
 from doxa_cli.errors import (
     BrokenConfigurationError,
@@ -28,7 +30,7 @@ def user(extra):
         click.secho(
             "\nYou must be logged in to show user information.", fg="cyan", bold=True
         )
-        return
+        sys.exit(1)
     except BrokenConfigurationError:
         click.secho(
             "\nOops, the DOXA CLI configuration file could not be read properly.\n",
@@ -36,17 +38,17 @@ def user(extra):
             bold=True,
         )
         try_to_fix_broken_config()
-        return
+        sys.exit(1)
     except SessionExpiredError:
         click.secho(
             "\nYour session has expired. Please log in again.",
             fg="yellow",
             bold=True,
         )
-        return
+        sys.exit(1)
     except:
         show_error("\nAn error occurred while performing this command.")
-        return
+        sys.exit(1)
 
     try:
         data = requests.post(
@@ -56,7 +58,7 @@ def user(extra):
         show_error(
             "Oops, your user information could not be fetched at this time. You might wish to try logging in again."
         )
-        return
+        sys.exit(1)
 
     click.secho(
         f"\nHello, {data['username']}! Here are your account details:\n",

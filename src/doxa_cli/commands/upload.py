@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import typing
 from urllib.parse import urljoin
@@ -44,19 +45,19 @@ def upload(directory, competition, environment):
         access_token = get_access_token()
     except LoggedOutError:
         show_error("\nYou must be logged in to upload a submission to DOXA.")
-        return
+        sys.exit(1)
     except BrokenConfigurationError:
         show_error(
             "\nOops, the DOXA CLI configuration file could not be read properly.\n"
         )
         try_to_fix_broken_config()
-        return
+        sys.exit(1)
     except SessionExpiredError:
         show_error("\nYour session has expired. Please log in again.")
-        return
+        sys.exit(1)
     except:
         show_error("\nAn error occurred while performing this command.")
-        return
+        sys.exit(1)
 
     # Step 1: read {directory}/doxa.yaml and verify that it is valid, e.g.
 
@@ -67,7 +68,7 @@ def upload(directory, competition, environment):
 
     if not os.path.exists(directory):
         show_error(f"\nThe directory `{directory}` does not exist.")
-        return
+        sys.exit(1)
 
     try:
         user_config = read_doxa_yaml(directory)
@@ -75,12 +76,12 @@ def upload(directory, competition, environment):
         show_error(
             "\nYour submission folder must contain a `doxa.yaml` file. Please check the DOXA website for guidance on what to include within it."
         )
-        return
+        sys.exit(1)
     except:
         show_error(
             "\nThere was an error reading the `doxa.yaml` file in your submission. Please check its syntax."
         )
-        return
+        sys.exit(1)
 
     # we can override competition and environment with command-line options,
     competition = competition or user_config.get(COMPETITION_KEY)
@@ -93,13 +94,13 @@ def upload(directory, competition, environment):
         show_error(
             "\nYou must specify a competition.\n\nYou can do so by inserting `competition: [COMPETITION TAG]` into the `doxa.yaml` file in your submission folder or by using the --competition/-c command-line option.\n\nRun this command with --help for more information."
         )
-        return
+        sys.exit(1)
 
     if not environment:
         show_error(
             "\nYou must specify an execution environment.\n\nYou can do so by inserting `environment: [ENVIRONMENT TAG]` into the `doxa.yaml` file in your submission folder or by using the --environment/-e command-line option.\n\nRun this command with --help for more information."
         )
-        return
+        sys.exit(1)
 
     # Step 2: POST /api/extern/upload-slot
 
@@ -153,12 +154,12 @@ def upload(directory, competition, environment):
                 "\nAn error occurred while requesting an upload slot, so your upload could not be processed."
             )
 
-        return
+        sys.exit(1)
     except:
         show_error(
             "\nAn error occurred while requesting an upload slot. Please try again later."
         )
-        return
+        sys.exit(1)
 
     # Step 3: produce tar.gz of {directory} using `tarfile` module
 
@@ -168,7 +169,7 @@ def upload(directory, competition, environment):
         )
     except:
         show_error("An error occurred creating a temporary file.")
-        return
+        sys.exit(1)
 
     print()
     with Halo(text="Compressing your submission.", spinner=BOUNCING_BAR) as spinner:
@@ -177,7 +178,7 @@ def upload(directory, competition, environment):
             spinner.succeed("Successfully compressed your submission")
         except:
             spinner.fail("Unable to compress your submission directory")
-            return
+            sys.exit(1)
 
     # Step 4:`upload the tarfile to {endpoint} making sure to pass in the header
     # - Authorization: Bearer {token from step 2}
@@ -208,7 +209,7 @@ def upload(directory, competition, environment):
                     raise UploadError
     except:
         show_error("\nOops, there was an error uploading your submission to DOXA.")
-        return
+        sys.exit(1)
     finally:
         os.unlink(temporary_file.name)
 
