@@ -117,9 +117,10 @@ def login():
                     spinner.succeed(
                         "Authorisation successful - you have now been logged in!"
                     )
+                    return
                 except:
                     spinner.fail("A CLI error occurred while logging you in.")
             else:
                 spinner.fail("Ooops, a CLI error occurred.")
 
-            break
+            sys.exit(1)

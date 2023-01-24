@@ -102,7 +102,27 @@ def upload(directory, competition, environment):
         )
         sys.exit(1)
 
-    # Step 2: POST /api/extern/upload-slot
+    # Step 2: produce tar.gz of {directory} using `tarfile` module
+
+    try:
+        temporary_file = tempfile.NamedTemporaryFile(
+            suffix=".tar.gz", delete=False, mode="w+b"
+        )
+    except:
+        show_error("An error occurred creating a temporary file.")
+        sys.exit(1)
+
+    print()
+    with Halo(text="Compressing your submission.", spinner=BOUNCING_BAR) as spinner:
+        try:
+            compress_submission_directory(temporary_file, directory)
+            spinner.succeed("Successfully compressed your submission")
+        except:
+            spinner.fail("Unable to compress your submission directory")
+            os.unlink(temporary_file.name)
+            sys.exit(1)
+
+    # Step 3: POST /api/extern/upload-slot
 
     # Headers:
     # - Authorization: Bearer {access token}
@@ -154,31 +174,14 @@ def upload(directory, competition, environment):
                 "\nAn error occurred while requesting an upload slot, so your upload could not be processed."
             )
 
+        os.unlink(temporary_file.name)
         sys.exit(1)
     except:
         show_error(
             "\nAn error occurred while requesting an upload slot. Please try again later."
         )
+        os.unlink(temporary_file.name)
         sys.exit(1)
-
-    # Step 3: produce tar.gz of {directory} using `tarfile` module
-
-    try:
-        temporary_file = tempfile.NamedTemporaryFile(
-            suffix=".tar.gz", delete=False, mode="w+b"
-        )
-    except:
-        show_error("An error occurred creating a temporary file.")
-        sys.exit(1)
-
-    print()
-    with Halo(text="Compressing your submission.", spinner=BOUNCING_BAR) as spinner:
-        try:
-            compress_submission_directory(temporary_file, directory)
-            spinner.succeed("Successfully compressed your submission")
-        except:
-            spinner.fail("Unable to compress your submission directory")
-            sys.exit(1)
 
     # Step 4:`upload the tarfile to {endpoint} making sure to pass in the header
     # - Authorization: Bearer {token from step 2}

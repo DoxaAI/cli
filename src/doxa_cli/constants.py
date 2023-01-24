@@ -35,6 +35,8 @@ DOXA_YAML = "doxa.yaml"
 COMPETITION_KEY = "competition"
 ENVIRONMENT_KEY = "environment"
 
+EXCLUDED_FILES = ("doxa.yaml", "__pycache__", ".ipynb_checkpoints")
+
 SPINNER = {
     "interval": 80,
     "frames": [

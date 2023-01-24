@@ -8,7 +8,13 @@ import click
 import requests
 import yaml
 
-from doxa_cli.constants import CONFIG_DIRECTORY, CONFIG_PATH, DOXA_YAML, TOKEN_URL
+from doxa_cli.constants import (
+    CONFIG_DIRECTORY,
+    CONFIG_PATH,
+    DOXA_YAML,
+    EXCLUDED_FILES,
+    TOKEN_URL,
+)
 from doxa_cli.errors import (
     BrokenConfigurationError,
     LoggedOutError,
@@ -43,30 +49,25 @@ def is_refresh_required(expires_at) -> bool:
     )
 
 
-def refresh_oauth_token(data) -> str:
+def refresh_oauth_token(refresh_token: str) -> str:
     now = datetime.datetime.now()
-    r = requests.post(
+    data = requests.post(
         TOKEN_URL,
-        data={"grant_type": "refresh_token", "refresh_token": data["refresh_token"]},
+        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
         verify=True,
-    )
-    access_time = now + r.elapsed
-    token = json.loads(r.text)
-    access_token = token["access_token"]
-    refresh_token = token["refresh_token"]
-    expires_in = datetime.timedelta(0, token["expires_in"])
+    ).json()
 
     with open(os.path.join(CONFIG_DIRECTORY, "config.json"), "w") as f:
         json.dump(
             {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "expires_at": access_time + expires_in,
+                "access_token": data["access_token"],
+                "refresh_token": data["refresh_token"],
+                "expires_at": now + datetime.timedelta(seconds=data["expires_in"]),
             },
             f,
             default=str,
         )
-    return token["access_token"]
+    return data["access_token"]
 
 
 def try_to_fix_broken_config() -> None:
@@ -91,8 +92,11 @@ def get_access_token() -> None:
 
     if is_refresh_required(config["expires_at"]):
         try:
-            return refresh_oauth_token()
-        except:
+            if "refresh_token" not in config:
+                raise ValueError
+
+            return refresh_oauth_token(config["refresh_token"])
+        except Exception as e:
             raise SessionExpiredError
 
     return config["access_token"]
@@ -104,15 +108,26 @@ def read_doxa_yaml(directory: str) -> dict:
         return yaml.safe_load(file)
 
 
-def compress_submission_directory(f: typing.IO, directory: str) -> None:
-    def reset(tarinfo):
-        tarinfo.uid = tarinfo.gid = 0
-        tarinfo.uname = tarinfo.gname = "root"
-        return tarinfo
+def filter_tar(tarinfo):
+    # Exclude certain files (e.g. the `doxa.yaml` file, symbolic links, etc)
+    if tarinfo.name in EXCLUDED_FILES or not (tarinfo.isfile() or tarinfo.isdir()):
+        return None
 
-    with tarfile.open(fileobj=f, mode="x:gz", format=tarfile.GNU_FORMAT) as tar:
+    # Reset user & group information
+    tarinfo.uid = tarinfo.gid = 0
+    tarinfo.uname = tarinfo.gname = "root"
+
+    return tarinfo
+
+
+def compress_submission_directory(f: typing.IO, directory: str) -> None:
+    with tarfile.open(fileobj=f, mode="w:gz", format=tarfile.PAX_FORMAT) as tar:
         for file_name in os.listdir(directory):
-            tar.add(os.path.join(directory, file_name), arcname=file_name, filter=reset)
+            tar.add(
+                os.path.join(directory, file_name),
+                arcname=file_name,
+                filter=filter_tar,
+            )
 
     f.close()
 
