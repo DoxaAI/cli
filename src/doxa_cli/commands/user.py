@@ -12,6 +12,7 @@ from doxa_cli.errors import (
     SessionExpiredError,
 )
 from doxa_cli.utils import (
+    clear_doxa_config,
     get_access_token,
     print_line,
     show_error,
@@ -45,6 +46,7 @@ def user(extra):
             fg="yellow",
             bold=True,
         )
+        clear_doxa_config()
         sys.exit(1)
     except:
         show_error("\nAn error occurred while performing this command.")
