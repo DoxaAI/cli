@@ -24,6 +24,7 @@ from doxa_cli.errors import (
     UploadSlotDeniedError,
 )
 from doxa_cli.utils import (
+    clear_doxa_config,
     compress_submission_directory,
     get_access_token,
     read_doxa_yaml,
@@ -54,6 +55,7 @@ def upload(directory, competition, environment):
         sys.exit(1)
     except SessionExpiredError:
         show_error("\nYour session has expired. Please log in again.")
+        clear_doxa_config()
         sys.exit(1)
     except:
         show_error("\nAn error occurred while performing this command.")
@@ -158,8 +160,12 @@ def upload(directory, competition, environment):
             "ENROLMENT_NOT_FOUND",
             "ENVIRONMENT_NOT_FOUND",
             "STORAGE_NODE_NOT_FOUND",
+            "UNKNOWN",
         ):
             show_error(f"\n{e.doxa_error_message}")
+        elif e.doxa_error_code == "UPLOAD_RATE_LIMIT_REACHED":
+            show_error("\nYour upload could not be processed.\n")
+            click.secho(e.doxa_error_message, bold=True)
         elif e.doxa_error_code == "INVALID_METADATA":
             show_error(
                 "\nYour upload could not be processed; the metadata provided in your `doxa.yaml` file is invalid."
