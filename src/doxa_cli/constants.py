@@ -5,16 +5,24 @@ import appdirs
 
 VERSION = "0.1"
 
-DOXA_BASE_URL = os.environ.get("DOXA_BASE_URL", "https://doxaai.com")
-DOXA_STORAGE_OVERRIDE_URL = os.environ.get("DOXA_STORAGE_OVERRIDE_URL")
+IS_DEV = os.environ.get("DOXA_ENV") in ("DEV", "DEVELOPMENT")
+IS_DEBUG = IS_DEV or os.environ.get("DOXA_DEBUG") in ("true", "TRUE")
 
-LOGIN_URL = f"{DOXA_BASE_URL}/api/oauth/device/code"
-TOKEN_URL = f"{DOXA_BASE_URL}/api/oauth/token"
-USER_URL = f"{DOXA_BASE_URL}/api/oauth/user"
-UPLOAD_SLOT_URL = f"{DOXA_BASE_URL}/api/extern/upload-slot"
+DOXA_BASE_URL = os.environ.get(
+    "DOXA_BASE_URL", "http://localhost:3001" if IS_DEV else "https://api.doxaai.com"
+)
+
+DOXA_STORAGE_URL = (
+    "http://localhost:4002/storage" if IS_DEV else os.environ.get("DOXA_STORAGE_URL")
+)
+
+LOGIN_URL = f"{DOXA_BASE_URL}/oauth/device/authorize"
+TOKEN_URL = f"{DOXA_BASE_URL}/oauth/token"
+USER_URL = f"{DOXA_BASE_URL}/oauth/userinfo"
+UPLOAD_SLOT_URL = f"{DOXA_BASE_URL}/upload/slot"
 
 CLIENT_ID = "eb594ca3-023d-477f-823a-22e48f4e5235"
-SCOPE = "basic"
+SCOPE = "openid profile email agent"
 
 
 def get_config_directory():
@@ -35,7 +43,7 @@ DOXA_YAML = "doxa.yaml"
 COMPETITION_KEY = "competition"
 ENVIRONMENT_KEY = "environment"
 
-EXCLUDED_FILES = ("doxa.yaml", "__pycache__", ".ipynb_checkpoints")
+EXCLUDED_FILES = ("doxa.yaml", "__pycache__", ".ipynb_checkpoints", ".DS_Store")
 
 SPINNER = {
     "interval": 80,

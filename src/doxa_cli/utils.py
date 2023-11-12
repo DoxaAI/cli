@@ -13,6 +13,8 @@ from doxa_cli.constants import (
     CONFIG_PATH,
     DOXA_YAML,
     EXCLUDED_FILES,
+    IS_DEBUG,
+    IS_DEV,
     TOKEN_URL,
 )
 from doxa_cli.errors import (
@@ -81,7 +83,7 @@ def try_to_fix_broken_config() -> None:
         )
 
 
-def get_access_token() -> None:
+def get_access_token() -> str:
     try:
         config = read_doxa_config()
     except FileNotFoundError:
@@ -132,8 +134,13 @@ def compress_submission_directory(f: typing.IO, directory: str) -> None:
     f.close()
 
 
-def show_error(message: str, color: str = "red") -> None:
+def show_error(
+    message: str, color: str = "red", exception: Exception | None = None
+) -> None:
     click.secho(message, fg=color, bold=True)
+
+    if IS_DEV or IS_DEBUG:
+        click.echo(exception)
 
 
 def print_line(key: str, value: str) -> None:

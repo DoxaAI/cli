@@ -12,7 +12,7 @@ from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 from doxa_cli.constants import (
     BOUNCING_BAR,
     COMPETITION_KEY,
-    DOXA_STORAGE_OVERRIDE_URL,
+    DOXA_STORAGE_URL,
     ENVIRONMENT_KEY,
     UPLOAD_SLOT_URL,
 )
@@ -38,18 +38,20 @@ from doxa_cli.utils import (
 @click.option("--competition", "-c", default=None, show_default=False, type=str)
 @click.option("--environment", "-e", default=None, show_default=False, type=str)
 def upload(directory, competition, environment):
-    """Upload and submit an agent to DOXA."""
+    """Upload and submit an agent to the DOXA AI platform."""
 
     # Step 0: ensure that the user is logged in!
 
     try:
         access_token = get_access_token()
     except LoggedOutError:
-        show_error("\nYou must be logged in to upload a submission to DOXA.")
+        show_error(
+            "\nYou must be logged in to upload a submission to the DOXA AI platform."
+        )
         sys.exit(1)
     except BrokenConfigurationError:
         show_error(
-            "\nOops, the DOXA CLI configuration file could not be read properly.\n"
+            "\nOops, the DOXA AI CLI configuration file could not be read properly.\n"
         )
         try_to_fix_broken_config()
         sys.exit(1)
@@ -57,8 +59,8 @@ def upload(directory, competition, environment):
         show_error("\nYour session has expired. Please log in again.")
         clear_doxa_config()
         sys.exit(1)
-    except:
-        show_error("\nAn error occurred while performing this command.")
+    except Exception as e:
+        show_error("\nAn error occurred while performing this command.", exception=e)
         sys.exit(1)
 
     # Step 1: read {directory}/doxa.yaml and verify that it is valid, e.g.
@@ -76,12 +78,13 @@ def upload(directory, competition, environment):
         user_config = read_doxa_yaml(directory)
     except FileNotFoundError:
         show_error(
-            "\nYour submission folder must contain a `doxa.yaml` file. Please check the DOXA website for guidance on what to include within it."
+            "\nYour submission folder must contain a `doxa.yaml` file. Please check the DOXA AI website for further guidance."
         )
         sys.exit(1)
-    except:
+    except Exception as e:
         show_error(
-            "\nThere was an error reading the `doxa.yaml` file in your submission. Please check its syntax."
+            "\nThere was an error reading the `doxa.yaml` file in your submission. Please check its syntax.",
+            exception=e,
         )
         sys.exit(1)
 
@@ -110,8 +113,8 @@ def upload(directory, competition, environment):
         temporary_file = tempfile.NamedTemporaryFile(
             suffix=".tar.gz", delete=False, mode="w+b"
         )
-    except:
-        show_error("An error occurred creating a temporary file.")
+    except Exception as e:
+        show_error("An error occurred creating a temporary file.", exception=e)
         sys.exit(1)
 
     print()
@@ -147,18 +150,20 @@ def upload(directory, competition, environment):
             access_token, competition, environment, user_config
         )
 
-        upload_endpoint = urljoin(
-            DOXA_STORAGE_OVERRIDE_URL or upload_slot["endpoint"], "upload"
-        )
+        base_url = DOXA_STORAGE_URL or upload_slot["endpoint"]
+        if not base_url.endswith("/"):
+            base_url += "/"
+
+        upload_endpoint = urljoin(base_url, "upload")
         upload_token = upload_slot["token"]
     except UploadSlotDeniedError as e:
         if e.doxa_error_code in (
-            "INVALID_COMPETITION_TAG",
-            "INVALID_ENVIRONMENT_TAG",
+            "COMPETITION_TAG_INVALID",
+            "ENVIRONMENT_TAG_INVALID",
             "COMPETITION_NOT_FOUND",
             "COMPETITION_CLOSED",
             "ENROLMENT_NOT_FOUND",
-            "ENVIRONMENT_NOT_FOUND",
+            "ENVIRONMENT_INVALID",
             "STORAGE_NODE_NOT_FOUND",
             "UNKNOWN",
         ):
@@ -166,25 +171,27 @@ def upload(directory, competition, environment):
         elif e.doxa_error_code == "UPLOAD_RATE_LIMIT_REACHED":
             show_error("\nYour upload could not be processed.\n")
             click.secho(e.doxa_error_message, bold=True)
-        elif e.doxa_error_code == "INVALID_METADATA":
+        elif e.doxa_error_code == "METADATA_INVALID":
             show_error(
-                "\nYour upload could not be processed; the metadata provided in your `doxa.yaml` file is invalid."
+                "\nThe metadata provided in your `doxa.yaml` file is invalid, so your upload could not be processed."
             )
 
             if e.doxa_error_message:
                 show_error(
-                    f"\nThe server gave the following reason: {e.doxa_error_message}"
+                    f"\nThe server platform the following reason: {e.doxa_error_message}"
                 )
         else:
             show_error(
-                "\nAn error occurred while requesting an upload slot, so your upload could not be processed."
+                "\nAn error occurred while requesting an upload slot, so your upload could not be processed.",
+                exception=e,
             )
 
         os.unlink(temporary_file.name)
         sys.exit(1)
-    except:
+    except Exception as e:
         show_error(
-            "\nAn error occurred while requesting an upload slot. Please try again later."
+            "\nAn error occurred while requesting an upload slot. Please try again later.",
+            exception=e,
         )
         os.unlink(temporary_file.name)
         sys.exit(1)
@@ -200,7 +207,7 @@ def upload(directory, competition, environment):
             with click.progressbar(
                 length=size,
                 label=click.style(
-                    "Uploading your submission to DOXA",
+                    "Uploading your submission",
                     fg="cyan",
                     bold=True,
                 ),
@@ -211,13 +218,18 @@ def upload(directory, competition, environment):
                 def callback(m):
                     bar.update(m.bytes_read)
 
-                result = upload_agent(upload_endpoint, upload_token, f, callback)
+                result = upload_agent(
+                    upload_endpoint, upload_token, temporary_file.name, f, callback
+                )
+
                 if result.get("success", False):
                     bar.update(size)
                 else:
                     raise UploadError
-    except:
-        show_error("\nOops, there was an error uploading your submission to DOXA.")
+    except Exception as e:
+        show_error(
+            "\nOops, there was an error uploading your submission to DOXA.", exception=e
+        )
         sys.exit(1)
     finally:
         os.unlink(temporary_file.name)
@@ -225,7 +237,7 @@ def upload(directory, competition, environment):
     # Step 5: print success message!
 
     click.secho(
-        "\nCongratulations - your submission was successfully uploaded to DOXA!",
+        "\nYour submission has been successfully uploaded to the DOXA AI platform!",
         fg="green",
         bold=True,
     )
@@ -262,10 +274,11 @@ def get_upload_slot(access_token, competition, environment, metadata):
 def upload_agent(
     upload_endpoint: str,
     upload_token: str,
-    f: typing.IO,
+    file_name: str,
+    file: typing.IO,
     callback: typing.Callable,
 ):
-    m = MultipartEncoderMonitor(MultipartEncoder(fields={"file": f}), callback)
+    m = MultipartEncoderMonitor(MultipartEncoder(fields={file_name: file}), callback)
 
     result = requests.post(
         upload_endpoint,

@@ -22,7 +22,7 @@ def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime
             res = requests.post(
                 TOKEN_URL,
                 data={
-                    "grant_type": "device_code",
+                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                     "client_id": CLIENT_ID,
                     "device_code": device_code,
                 },
@@ -33,10 +33,7 @@ def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime
             break
 
         if "error" in res:
-            if (
-                "code" in res["error"]
-                and res["error"]["code"] == "authorization_pending"
-            ):
+            if res["error"] == "authorization_pending":
                 yield "PENDING", None
                 time.sleep(interval)
             else:
@@ -92,7 +89,7 @@ def login():
     expires_at = now + datetime.timedelta(seconds=data["expires_in"])
 
     with Halo(text="Waiting for approval", spinner=SPINNER, enabled=True) as spinner:
-        for (state, result) in wait_for_auth(
+        for state, result in wait_for_auth(
             data["device_code"], data["interval"], expires_at
         ):
             if state == "PENDING":
@@ -106,7 +103,7 @@ def login():
                 spinner.fail("A CLI error occurred during the authorisation process.")
             elif state == "AUTH_ERROR":
                 spinner.fail("An error occurred while attempting to log you in.")
-            elif state == "SUCCESS":
+            elif state == "SUCCESS" and result is not None:
                 try:
                     update_doxa_config(
                         access_token=result["access_token"],
