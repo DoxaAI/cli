@@ -1,10 +1,10 @@
 import datetime
-import sys
 import time
 import webbrowser
 
 import click
 import requests
+import typer
 from halo import Halo
 
 from doxa_cli.constants import CLIENT_ID, LOGIN_URL, SCOPE, SPINNER, TOKEN_URL
@@ -55,9 +55,8 @@ def get_device_code():
     return result
 
 
-@click.command()
 def login():
-    """Log in with your DOXA account."""
+    """Log in with your DOXA AI platform account."""
 
     now = datetime.datetime.now()
 
@@ -67,7 +66,7 @@ def login():
         show_error(
             "\nAn error occurred while initiating the authorisation process. Please try again later."
         )
-        sys.exit(1)
+        raise typer.Exit(1)
 
     click.secho(
         "\nUse the link below to log into the CLI using your DOXA account:",
@@ -84,7 +83,7 @@ def login():
             bold=True,
         )
     except:
-        click.secho("\n")
+        typer.echo("\n")
 
     expires_at = now + datetime.timedelta(seconds=data["expires_in"])
 
@@ -120,4 +119,4 @@ def login():
             else:
                 spinner.fail("Ooops, a CLI error occurred.")
 
-            sys.exit(1)
+            raise typer.Exit(1)

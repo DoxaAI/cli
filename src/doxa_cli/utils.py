@@ -1,27 +1,21 @@
 import datetime
 import json
 import os
-import tarfile
-import typing
 
-import click
 import requests
+import rich
+import typer
 import yaml
 
 from doxa_cli.constants import (
     CONFIG_DIRECTORY,
     CONFIG_PATH,
     DOXA_YAML,
-    EXCLUDED_FILES,
     IS_DEBUG,
     IS_DEV,
     TOKEN_URL,
 )
-from doxa_cli.errors import (
-    BrokenConfigurationError,
-    LoggedOutError,
-    SessionExpiredError,
-)
+from doxa_cli.errors import LoggedOutError, SessionExpiredError
 
 
 def read_doxa_config() -> dict:
@@ -41,8 +35,14 @@ def update_doxa_config(**kwargs) -> None:
 
 
 def clear_doxa_config() -> None:
-    os.remove(CONFIG_PATH)
-    os.rmdir(CONFIG_DIRECTORY)
+    try:
+        os.remove(CONFIG_PATH)
+        os.rmdir(CONFIG_DIRECTORY)
+    except:
+        show_error(
+            f"\nThe DOXA CLI was unable to reset its configuration.\n\nPlease manually delete the file at the following path: {CONFIG_PATH}\n\n",
+        )
+        raise typer.Exit(1)
 
 
 def is_refresh_required(expires_at) -> bool:
@@ -69,18 +69,8 @@ def refresh_oauth_token(refresh_token: str) -> str:
             f,
             default=str,
         )
+
     return data["access_token"]
-
-
-def try_to_fix_broken_config() -> None:
-    try:
-        clear_doxa_config()
-        click.secho("Please log in again to fix this issue.", fg="green", bold=True)
-    except:
-        show_error("The DOXA CLI was unable to reset its configuration.\n")
-        click.echo(
-            f"Please manually delete the file at the following path: {CONFIG_PATH}."
-        )
 
 
 def get_access_token() -> str:
@@ -90,15 +80,17 @@ def get_access_token() -> str:
         raise LoggedOutError
     except (ValueError, AssertionError):
         # oops, the config is corrupted!
-        raise BrokenConfigurationError
+        show_error(
+            "\nOops, the DOXA CLI configuration file could not be read properly. You may need to log in again to fix the issue.\n"
+        )
+        clear_doxa_config()
+        raise typer.Exit(1)
 
     if is_refresh_required(config["expires_at"]):
         try:
-            if "refresh_token" not in config:
-                raise ValueError
-
             return refresh_oauth_token(config["refresh_token"])
-        except Exception as e:
+        except:
+            clear_doxa_config()
             raise SessionExpiredError
 
     return config["access_token"]
@@ -110,41 +102,12 @@ def read_doxa_yaml(directory: str) -> dict:
         return yaml.safe_load(file)
 
 
-def filter_tar(tarinfo):
-    # Exclude certain files (e.g. the `doxa.yaml` file, symbolic links, etc)
-    if tarinfo.name in EXCLUDED_FILES or not (tarinfo.isfile() or tarinfo.isdir()):
-        return None
-
-    # Reset user & group information
-    tarinfo.uid = tarinfo.gid = 0
-    tarinfo.uname = tarinfo.gname = "root"
-
-    return tarinfo
-
-
-def compress_submission_directory(f: typing.IO, directory: str) -> None:
-    with tarfile.open(fileobj=f, mode="w:gz", format=tarfile.PAX_FORMAT) as tar:
-        for file_name in os.listdir(directory):
-            tar.add(
-                os.path.join(directory, file_name),
-                arcname=file_name,
-                filter=filter_tar,
-            )
-
-    f.close()
-
-
 def show_error(
-    message: str, color: str = "red", exception: Exception | None = None
+    message: str = "An error occurred while performing this command.",
+    color: str = "red",
 ) -> None:
-    click.secho(message, fg=color, bold=True)
+    console = rich.console.Console()
+    console.print(f"\n{message}\n", style=f"bold {color}")
 
     if IS_DEV or IS_DEBUG:
-        click.echo(exception)
-
-
-def print_line(key: str, value: str) -> None:
-    click.echo(
-        click.style(f"{key + ': ':<32}", fg="cyan", bold=True)
-        + click.style(value, bold=True)
-    )
+        console.print_exception()

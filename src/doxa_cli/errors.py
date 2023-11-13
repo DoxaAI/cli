@@ -10,16 +10,15 @@ class SessionExpiredError(DoxaError):
     pass
 
 
-class BrokenConfigurationError(DoxaError):
-    pass
-
-
 class UploadSlotDeniedError(DoxaError):
     def __init__(self, code, message, *args: object) -> None:
         super().__init__(*args)
-        self.doxa_error_code = code
-        self.doxa_error_message = message
+        self.doxa_error_code: str = code
+        self.doxa_error_message: str = message
 
 
 class UploadError(DoxaError):
-    pass
+    def __init__(self, code, message, *args: object) -> None:
+        super().__init__(*args)
+        self.doxa_error_code: str = code
+        self.doxa_error_message: str = message

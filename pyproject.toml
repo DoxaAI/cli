@@ -1,25 +1,23 @@
 [project]
 name = "doxa-cli"
-version = "0.1.2"
-authors = [
-  { name="Jeremy Lo Ying Ping", email="jeremyloyingping@gmail.com" },
-]
+version = "0.1.4"
+authors = [{ name = "Jeremy Lo Ying Ping", email = "jeremy@doxaai.com" }]
 description = "The CLI for interacting with DOXA, a powerful platform for running engaging online artificial intelligence competitions."
 readme = "README.md"
-license = { file="LICENSE" }
+license = { file = "LICENSE" }
 requires-python = ">=3.7"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
 dependencies = [
-  "click ~= 8.1.3",
+  "typer[all] >= 0.9.0",
   "halo ~= 0.0.31, >= 0.0.31",
   "requests ~= 2.26.0",
   "requests_toolbelt ~= 0.10.1",
   "appdirs >= 1.4.4",
-  "pyyaml >= 6.0"
+  "pyyaml >= 6.0",
 ]
 
 [project.scripts]

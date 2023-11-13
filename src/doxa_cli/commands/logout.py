@@ -1,10 +1,10 @@
 import click
+
 from doxa_cli.utils import clear_doxa_config, show_error
 
 
-@click.command()
 def logout():
-    """Log out of your DOXA account."""
+    """Log out of your DOXA AI platform account."""
 
     try:
         clear_doxa_config()

@@ -1,71 +1,60 @@
-import sys
-
-import click
 import requests
+import typer
+from rich.console import Console
+from rich.table import Table
 
 from doxa_cli.constants import USER_URL
-from doxa_cli.errors import (
-    BrokenConfigurationError,
-    LoggedOutError,
-    SessionExpiredError,
-)
-from doxa_cli.utils import (
-    clear_doxa_config,
-    get_access_token,
-    print_line,
-    show_error,
-    try_to_fix_broken_config,
-)
+from doxa_cli.errors import LoggedOutError, SessionExpiredError
+from doxa_cli.utils import get_access_token, show_error
 
 
-@click.command()
 def user():
     """Display DOXA account information. You must be logged in."""
+
+    console = Console()
 
     try:
         access_token = get_access_token()
     except LoggedOutError:
-        click.secho(
-            "\nYou must be logged in to show user information.", fg="cyan", bold=True
+        console.print(
+            "\nYou must be logged in to see user information.", style="bold cyan"
         )
-        sys.exit(1)
-    except BrokenConfigurationError:
-        click.secho(
-            "\nOops, the DOXA CLI configuration file could not be read properly.\n",
-            fg="yellow",
-            bold=True,
-        )
-        try_to_fix_broken_config()
-        sys.exit(1)
+        raise typer.Exit(1)
     except SessionExpiredError:
-        click.secho(
-            "\nYour session has expired. Please log in again.",
-            fg="yellow",
-            bold=True,
+        console.print(
+            "\nYour session has expired. Please log in again.", style="bold yellow"
         )
-        clear_doxa_config()
-        sys.exit(1)
-    except Exception as e:
-        show_error("\nAn error occurred while performing this command.", exception=e)
-        sys.exit(1)
+        raise typer.Exit(1)
+    except:
+        show_error()
+        raise typer.Exit(1)
 
     try:
         data = requests.get(
             USER_URL, headers={"Authorization": f"Bearer {access_token}"}, verify=True
         ).json()
-    except Exception as e:
-        print("error", e)
+    except:
         show_error(
-            "Oops, your user information could not be fetched at this time. You might wish to try logging in again."
+            "Oops, your user information could not be fetched at this time. You may wish to try logging in again."
         )
-        sys.exit(1)
+        raise typer.Exit(1)
 
-    click.secho(
-        f"\nHello, {data['preferred_username']}! Here are your account details:\n",
-        fg="green",
-        bold=True,
+    console.print(
+        f"\nHello, @{data['preferred_username']}! Here are your account details:\n",
+        style="bold green",
     )
 
-    print_line("Username", data["preferred_username"])
-    print_line("Email", data["email"])
-    print_line("Tag", data["sub"])
+    table = Table(
+        title=f"User Information for @{data['preferred_username']}",
+        leading=1,
+        title_style="bold white",
+    )
+
+    table.add_column("Field", style="bold cyan")
+    table.add_column("Value", overflow="fold")
+
+    table.add_row("Username", data["preferred_username"])
+    table.add_row("Email", data["email"])
+    table.add_row("Tag", data["sub"])
+
+    console.print(table)

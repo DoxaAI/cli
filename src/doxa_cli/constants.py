@@ -2,6 +2,7 @@ import os
 import platform
 
 import appdirs
+from rich.theme import Theme
 
 VERSION = "0.1"
 
@@ -94,3 +95,15 @@ BOUNCING_BAR = {
         "[=   ]",
     ],
 }
+
+theme = Theme(
+    {
+        "bar.pulse": "blue",
+        "bar.complete": "bold green",
+        "bar.finished": "bold green",
+        "progress.description": "bold white",
+        "progress.percentage": "bold white",
+        "progress.download": "white",
+        "progress.data.speed": "bold cyan",
+    }
+)

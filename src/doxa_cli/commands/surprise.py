@@ -1,14 +1,13 @@
 import webbrowser
 from time import sleep
 
-import click
 from halo import Halo
 
 
-@click.command(hidden=True)
 def surprise():
-    print()
+    """A surprise just for you :-)"""
 
+    print()
     with Halo(
         "Enjoy this surprise ;)",
         spinner={"interval": 300, "frames": ["🙈 ", "🙈 ", "🙉 ", "🙊 "]},

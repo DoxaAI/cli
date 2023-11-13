@@ -1,4 +1,4 @@
-import click
+import typer
 
 from doxa_cli.commands.config import config
 from doxa_cli.commands.login import login
@@ -7,23 +7,17 @@ from doxa_cli.commands.surprise import surprise
 from doxa_cli.commands.upload import upload
 from doxa_cli.commands.user import user
 
+main = typer.Typer(
+    name="DOXA AI CLI",
+    no_args_is_help=True,
+    help="This CLI application allows you to interact with the DOXA AI platform: a powerful platform for hosting engaging competitions in artificial intelligence and machine learning.",
+)
 
-@click.group()
-@click.pass_context
-def main(ctx):
-    """The DOXA CLI is the primary tool for uploading agents to DOXA."""
+main.command()(login)
+main.command()(logout)
+main.command()(user)
 
-    if ctx.invoked_subcommand is None:
-        click.secho("Hi! Welcome to the DOXA CLI!", bold=True, fg="green")
+main.command(hidden=True)(config)
+main.command(hidden=True)(surprise)
 
-
-main.add_command(config)
-main.add_command(login)
-main.add_command(logout)
-main.add_command(surprise)
-main.add_command(upload)
-main.add_command(user)
-
-
-if __name__ == "__main__":
-    main()
+main.command(no_args_is_help=True)(upload)

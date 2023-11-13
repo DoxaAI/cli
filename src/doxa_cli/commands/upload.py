@@ -1,44 +1,67 @@
 import os
-import sys
+import tarfile
 import tempfile
 import typing
+from pathlib import Path
+from typing import Optional
 from urllib.parse import urljoin
 
-import click
 import requests
-from halo import Halo
+import typer
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TransferSpeedColumn,
+)
+from typing_extensions import Annotated
 
 from doxa_cli.constants import (
-    BOUNCING_BAR,
     COMPETITION_KEY,
     DOXA_STORAGE_URL,
     ENVIRONMENT_KEY,
+    EXCLUDED_FILES,
     UPLOAD_SLOT_URL,
+    theme,
 )
 from doxa_cli.errors import (
-    BrokenConfigurationError,
     LoggedOutError,
     SessionExpiredError,
     UploadError,
     UploadSlotDeniedError,
 )
-from doxa_cli.utils import (
-    clear_doxa_config,
-    compress_submission_directory,
-    get_access_token,
-    read_doxa_yaml,
-    show_error,
-    try_to_fix_broken_config,
-)
+from doxa_cli.utils import get_access_token, read_doxa_yaml, show_error
 
 
-@click.command()
-@click.argument("directory", nargs=1, type=str)
-@click.option("--competition", "-c", default=None, show_default=False, type=str)
-@click.option("--environment", "-e", default=None, show_default=False, type=str)
-def upload(directory, competition, environment):
+def upload(
+    directory: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            readable=True,
+            resolve_path=True,
+            help="The path to the directory containing your submission.",
+            show_default=False,
+        ),
+    ],
+    competition: Annotated[
+        Optional[str], typer.Option("--competition", "-c", show_default=False)
+    ] = None,
+    environment: Annotated[
+        Optional[str], typer.Option("--environment", "-e", show_default=False)
+    ] = None,
+):
     """Upload and submit an agent to the DOXA AI platform."""
+
+    console = Console()
 
     # Step 0: ensure that the user is logged in!
 
@@ -46,22 +69,15 @@ def upload(directory, competition, environment):
         access_token = get_access_token()
     except LoggedOutError:
         show_error(
-            "\nYou must be logged in to upload a submission to the DOXA AI platform."
+            "You must be logged in to upload a submission to the DOXA AI platform."
         )
-        sys.exit(1)
-    except BrokenConfigurationError:
-        show_error(
-            "\nOops, the DOXA AI CLI configuration file could not be read properly.\n"
-        )
-        try_to_fix_broken_config()
-        sys.exit(1)
+        raise typer.Exit(1)
     except SessionExpiredError:
-        show_error("\nYour session has expired. Please log in again.")
-        clear_doxa_config()
-        sys.exit(1)
-    except Exception as e:
-        show_error("\nAn error occurred while performing this command.", exception=e)
-        sys.exit(1)
+        show_error("Your session has expired. Please log in again.")
+        raise typer.Exit(1)
+    except Exception:
+        show_error()
+        raise typer.Exit(1)
 
     # Step 1: read {directory}/doxa.yaml and verify that it is valid, e.g.
 
@@ -70,23 +86,20 @@ def upload(directory, competition, environment):
     # language: python
     # entrypoint: run.py
 
-    if not os.path.exists(directory):
-        show_error(f"\nThe directory `{directory}` does not exist.")
-        sys.exit(1)
+    path = str(directory)
 
     try:
-        user_config = read_doxa_yaml(directory)
+        user_config = read_doxa_yaml(path)
     except FileNotFoundError:
         show_error(
             "\nYour submission folder must contain a `doxa.yaml` file. Please check the DOXA AI website for further guidance."
         )
-        sys.exit(1)
+        raise typer.Exit(1)
     except Exception as e:
         show_error(
-            "\nThere was an error reading the `doxa.yaml` file in your submission. Please check its syntax.",
-            exception=e,
+            "\nThere was an error reading the `doxa.yaml` file in your submission. Please check its syntax."
         )
-        sys.exit(1)
+        raise typer.Exit(1)
 
     # we can override competition and environment with command-line options,
     competition = competition or user_config.get(COMPETITION_KEY)
@@ -99,13 +112,13 @@ def upload(directory, competition, environment):
         show_error(
             "\nYou must specify a competition.\n\nYou can do so by inserting `competition: [COMPETITION TAG]` into the `doxa.yaml` file in your submission folder or by using the --competition/-c command-line option.\n\nRun this command with --help for more information."
         )
-        sys.exit(1)
+        raise typer.Exit(1)
 
     if not environment:
         show_error(
             "\nYou must specify an execution environment.\n\nYou can do so by inserting `environment: [ENVIRONMENT TAG]` into the `doxa.yaml` file in your submission folder or by using the --environment/-e command-line option.\n\nRun this command with --help for more information."
         )
-        sys.exit(1)
+        raise typer.Exit(1)
 
     # Step 2: produce tar.gz of {directory} using `tarfile` module
 
@@ -114,18 +127,14 @@ def upload(directory, competition, environment):
             suffix=".tar.gz", delete=False, mode="w+b"
         )
     except Exception as e:
-        show_error("An error occurred creating a temporary file.", exception=e)
-        sys.exit(1)
+        show_error("An error occurred creating a temporary file.")
+        raise typer.Exit(1)
 
-    print()
-    with Halo(text="Compressing your submission.", spinner=BOUNCING_BAR) as spinner:
-        try:
-            compress_submission_directory(temporary_file, directory)
-            spinner.succeed("Successfully compressed your submission")
-        except:
-            spinner.fail("Unable to compress your submission directory")
-            os.unlink(temporary_file.name)
-            sys.exit(1)
+    try:
+        compress_submission_directory(temporary_file, path)
+    except:
+        os.unlink(temporary_file.name)
+        raise typer.Exit(1)
 
     # Step 3: POST /api/extern/upload-slot
 
@@ -167,34 +176,36 @@ def upload(directory, competition, environment):
             "STORAGE_NODE_NOT_FOUND",
             "UNKNOWN",
         ):
-            show_error(f"\n{e.doxa_error_message}")
+            first_line, *lines = e.doxa_error_message.split("\n")
+            show_error(first_line)
+            if lines:
+                console.print(*lines, sep="\n\n", style="bold white")
         elif e.doxa_error_code == "UPLOAD_RATE_LIMIT_REACHED":
-            show_error("\nYour upload could not be processed.\n")
-            click.secho(e.doxa_error_message, bold=True)
+            show_error("Your upload could not be processed.")
+            console.print(e.doxa_error_message, style="bold white")
         elif e.doxa_error_code == "METADATA_INVALID":
             show_error(
                 "\nThe metadata provided in your `doxa.yaml` file is invalid, so your upload could not be processed."
             )
 
             if e.doxa_error_message:
-                show_error(
-                    f"\nThe server platform the following reason: {e.doxa_error_message}"
+                console.print(
+                    f"\nThe platform gave the following reason: {e.doxa_error_message}",
+                    style="bold white",
                 )
         else:
             show_error(
-                "\nAn error occurred while requesting an upload slot, so your upload could not be processed.",
-                exception=e,
+                "\nAn error occurred while requesting an upload slot, so your upload could not be processed."
             )
 
         os.unlink(temporary_file.name)
-        sys.exit(1)
-    except Exception as e:
+        raise typer.Exit(1)
+    except Exception:
         show_error(
-            "\nAn error occurred while requesting an upload slot. Please try again later.",
-            exception=e,
+            "\nAn error occurred while requesting an upload slot. Please try again later."
         )
         os.unlink(temporary_file.name)
-        sys.exit(1)
+        raise typer.Exit(1)
 
     # Step 4:`upload the tarfile to {endpoint} making sure to pass in the header
     # - Authorization: Bearer {token from step 2}
@@ -204,42 +215,41 @@ def upload(directory, competition, environment):
         size = os.path.getsize(temporary_file.name)
         with open(temporary_file.name, "rb") as f:
             # show a fancy progress bar of the upload!
-            with click.progressbar(
-                length=size,
-                label=click.style(
-                    "Uploading your submission",
-                    fg="cyan",
-                    bold=True,
-                ),
-                bar_template=f"%(label)s {click.style('[', bold=True)}%(bar)s{click.style(']', bold=True)} {click.style('%(info)s', bold=True)}",
-                fill_char=click.style("#", fg="blue"),
-            ) as bar:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                "    ",
+                DownloadColumn(),
+                "    ",
+                TransferSpeedColumn(),
+                console=Console(theme=theme),
+            ) as progress:
+                task = progress.add_task("Uploading your submission  ", total=size)
 
                 def callback(m):
-                    bar.update(m.bytes_read)
+                    progress.update(task, completed=m.bytes_read)
 
-                result = upload_agent(
-                    upload_endpoint, upload_token, temporary_file.name, f, callback
-                )
+                result = upload_agent(upload_endpoint, upload_token, f, callback)
 
                 if result.get("success", False):
-                    bar.update(size)
+                    progress.update(task, completed=size)
                 else:
-                    raise UploadError
-    except Exception as e:
-        show_error(
-            "\nOops, there was an error uploading your submission to DOXA.", exception=e
-        )
-        sys.exit(1)
+                    raise UploadError(result.get("error_code"), result.get("message"))
+    except UploadError as e:
+        console.print(f"\n  [bold red]ERROR[white]: {e.doxa_error_message}")
+        raise typer.Exit(1)
+    except Exception:
+        show_error("\nOops, there was an error uploading your submission to DOXA.")
+        raise typer.Exit(1)
     finally:
         os.unlink(temporary_file.name)
 
     # Step 5: print success message!
 
-    click.secho(
-        "\nYour submission has been successfully uploaded to the DOXA AI platform!",
-        fg="green",
-        bold=True,
+    console.print(
+        "\n  [bold cyan]Your submission has been successfully uploaded to the DOXA AI platform!"
     )
 
 
@@ -271,14 +281,52 @@ def get_upload_slot(access_token, competition, environment, metadata):
     return result
 
 
+def filter_tar(tarinfo):
+    # Exclude certain files (e.g. the `doxa.yaml` file, symbolic links, etc)
+    if tarinfo.name in EXCLUDED_FILES or not (tarinfo.isfile() or tarinfo.isdir()):
+        return None
+
+    # Reset user & group information
+    tarinfo.uid = tarinfo.gid = 0
+    tarinfo.uname = tarinfo.gname = "root"
+
+    return tarinfo
+
+
+def compress_submission_directory(f: typing.IO, directory: str) -> None:
+    try:
+        print()
+        with tarfile.open(fileobj=f, mode="w:gz", format=tarfile.PAX_FORMAT) as tar:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                "    ",
+                MofNCompleteColumn(),
+                "files",
+                console=Console(theme=theme),
+            ) as progress:
+                for file_name in progress.track(
+                    os.listdir(directory),
+                    description="Compressing your submission",
+                ):
+                    tar.add(
+                        os.path.join(directory, file_name),
+                        arcname=file_name,
+                        filter=filter_tar,
+                    )
+    finally:
+        f.close()
+
+
 def upload_agent(
     upload_endpoint: str,
     upload_token: str,
-    file_name: str,
     file: typing.IO,
     callback: typing.Callable,
 ):
-    m = MultipartEncoderMonitor(MultipartEncoder(fields={file_name: file}), callback)
+    m = MultipartEncoderMonitor(MultipartEncoder(fields={file.name: file}), callback)
 
     result = requests.post(
         upload_endpoint,
