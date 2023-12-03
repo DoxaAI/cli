@@ -1,7 +1,7 @@
 import os
 import platform
 
-import appdirs
+import platformdirs
 from rich.theme import Theme
 
 VERSION = "0.1"
@@ -32,9 +32,9 @@ def get_config_directory():
         return directory
 
     if platform.system() == "Darwin":
-        return appdirs.user_data_dir(appname="doxa", version=VERSION)
+        return platformdirs.user_data_dir(appname="doxa", version=VERSION)
 
-    return appdirs.user_config_dir(appname="doxa", version=VERSION)
+    return platformdirs.user_config_dir(appname="doxa", version=VERSION)
 
 
 CONFIG_DIRECTORY = get_config_directory()
@@ -44,7 +44,7 @@ DOXA_YAML = "doxa.yaml"
 COMPETITION_KEY = "competition"
 ENVIRONMENT_KEY = "environment"
 
-EXCLUDED_FILES = ("doxa.yaml", "__pycache__", ".ipynb_checkpoints", ".DS_Store")
+EXCLUDED_FILES = {"doxa.yaml", "__pycache__", ".ipynb_checkpoints", ".DS_Store"}
 
 SPINNER = {
     "interval": 80,

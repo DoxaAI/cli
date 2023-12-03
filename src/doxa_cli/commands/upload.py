@@ -1,3 +1,4 @@
+import fnmatch
 import os
 import tarfile
 import tempfile
@@ -122,6 +123,15 @@ def upload(
 
     # Step 2: produce tar.gz of {directory} using `tarfile` module
 
+    ignore_files = user_config.get("ignore", [])
+    if not isinstance(ignore_files, list) or not all(
+        isinstance(pattern, str) for pattern in ignore_files
+    ):
+        show_error(
+            "\nIf you specify `ignore` in your `doxa.yaml` file, it must be a list of file name matching patterns."
+        )
+        raise typer.Exit(1)
+
     try:
         temporary_file = tempfile.NamedTemporaryFile(
             suffix=".tar.gz", delete=False, mode="w+b"
@@ -130,8 +140,10 @@ def upload(
         show_error("An error occurred creating a temporary file.")
         raise typer.Exit(1)
 
+    print()
+
     try:
-        compress_submission_directory(temporary_file, path)
+        compress_submission_directory(temporary_file, path, ignore_files)
     except:
         os.unlink(temporary_file.name)
         raise typer.Exit(1)
@@ -281,21 +293,28 @@ def get_upload_slot(access_token, competition, environment, metadata):
     return result
 
 
-def filter_tar(tarinfo):
-    # Exclude certain files (e.g. the `doxa.yaml` file, symbolic links, etc)
-    if tarinfo.name in EXCLUDED_FILES or not (tarinfo.isfile() or tarinfo.isdir()):
-        return None
+def compress_submission_directory(
+    f: typing.IO, directory: str, ignore_files: list[str]
+) -> None:
+    excluded_file_patterns = EXCLUDED_FILES | set(ignore_files)
 
-    # Reset user & group information
-    tarinfo.uid = tarinfo.gid = 0
-    tarinfo.uname = tarinfo.gname = "root"
+    def filter_tar(tarinfo: tarfile.TarInfo):
+        # Exclude certain files (e.g. the `doxa.yaml` file, symbolic links, etc)
+        if not (tarinfo.isfile() or tarinfo.isdir()) or any(
+            fnmatch.fnmatch(tarinfo.name, pattern) for pattern in excluded_file_patterns
+        ):
+            return None
 
-    return tarinfo
+        # Reset user & group information
+        tarinfo.uid = tarinfo.gid = 0
+        tarinfo.uname = tarinfo.gname = "root"
 
+        # Normalise permissions
+        tarinfo.mode |= 0o777 if tarinfo.isfile() else 0o775
 
-def compress_submission_directory(f: typing.IO, directory: str) -> None:
+        return tarinfo
+
     try:
-        print()
         with tarfile.open(fileobj=f, mode="w:gz", format=tarfile.PAX_FORMAT) as tar:
             with Progress(
                 SpinnerColumn(),

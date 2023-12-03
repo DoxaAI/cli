@@ -29,9 +29,15 @@ def read_doxa_config() -> dict:
 
 
 def update_doxa_config(**kwargs) -> None:
-    os.makedirs(CONFIG_DIRECTORY, exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(kwargs, f, default=str)
+    try:
+        os.makedirs(CONFIG_DIRECTORY, exist_ok=True)
+        with open(CONFIG_PATH, "w") as f:
+            json.dump(kwargs, f, default=str)
+    except OSError:
+        show_error(
+            f"\nThe DOXA CLI configuration file at `{CONFIG_PATH}` could not be written properly. If this location is not writable, you may specify an alternative configuration directory by setting the `DOXA_CONFIG_DIRECTORY` environment variable."
+        )
+        raise typer.Exit(1)
 
 
 def clear_doxa_config() -> None:
@@ -78,6 +84,11 @@ def get_access_token() -> str:
         config = read_doxa_config()
     except FileNotFoundError:
         raise LoggedOutError
+    except OSError:
+        show_error(
+            f"\nThe DOXA CLI configuration file at `{CONFIG_PATH}` could not be read properly. If this location is not readable, you may specify an alternative configuration directory by setting the `DOXA_CONFIG_DIRECTORY` environment variable."
+        )
+        raise typer.Exit(1)
     except (ValueError, AssertionError):
         # oops, the config is corrupted!
         show_error(
