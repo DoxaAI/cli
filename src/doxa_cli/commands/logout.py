@@ -1,13 +1,14 @@
 import click
 
-from doxa_cli.utils import clear_doxa_config, show_error
+from doxa_cli.config import CONFIG
+from doxa_cli.errors import show_error
 
 
 def logout():
     """Log out of your DOXA AI platform account."""
 
     try:
-        clear_doxa_config()
+        CONFIG.clear()
     except FileNotFoundError:
         pass
     except:

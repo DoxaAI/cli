@@ -4,7 +4,7 @@ import tarfile
 import tempfile
 import typing
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -32,12 +32,13 @@ from doxa_cli.constants import (
     theme,
 )
 from doxa_cli.errors import (
-    LoggedOutError,
     SessionExpiredError,
+    SignedOutError,
     UploadError,
     UploadSlotDeniedError,
+    show_error,
 )
-from doxa_cli.utils import get_access_token, read_doxa_yaml, show_error
+from doxa_cli.utils import get_request_client, read_doxa_yaml
 
 
 def upload(
@@ -67,8 +68,8 @@ def upload(
     # Step 0: ensure that the user is logged in!
 
     try:
-        access_token = get_access_token()
-    except LoggedOutError:
+        session = get_request_client(require_auth=True)
+    except SignedOutError:
         show_error(
             "You must be logged in to upload a submission to the DOXA AI platform."
         )
@@ -89,14 +90,16 @@ def upload(
 
     path = str(directory)
 
+    user_config = {}
     try:
         user_config = read_doxa_yaml(path)
     except FileNotFoundError:
-        show_error(
-            "\nYour submission folder must contain a `doxa.yaml` file. Please check the DOXA AI website for further guidance."
-        )
-        raise typer.Exit(1)
-    except Exception as e:
+        if not competition:
+            show_error(
+                "\nYour submission folder must contain a `doxa.yaml` file. Please check the DOXA AI website for further guidance."
+            )
+            raise typer.Exit(1)
+    except:
         show_error(
             "\nThere was an error reading the `doxa.yaml` file in your submission. Please check its syntax."
         )
@@ -112,12 +115,6 @@ def upload(
     if not competition:
         show_error(
             "\nYou must specify a competition.\n\nYou can do so by inserting `competition: [COMPETITION TAG]` into the `doxa.yaml` file in your submission folder or by using the --competition/-c command-line option.\n\nRun this command with --help for more information."
-        )
-        raise typer.Exit(1)
-
-    if not environment:
-        show_error(
-            "\nYou must specify an execution environment.\n\nYou can do so by inserting `environment: [ENVIRONMENT TAG]` into the `doxa.yaml` file in your submission folder or by using the --environment/-e command-line option.\n\nRun this command with --help for more information."
         )
         raise typer.Exit(1)
 
@@ -148,28 +145,10 @@ def upload(
         os.unlink(temporary_file.name)
         raise typer.Exit(1)
 
-    # Step 3: POST /api/extern/upload-slot
-
-    # Headers:
-    # - Authorization: Bearer {access token}
-
-    # Request:
-    # {
-    #   "competition_tag": "uttt",
-    #   "environment_tag": "cpu",
-    #   "metadata": { ... }
-    # }
-
-    # Response (success):
-    # { "success": true, "endpoint": "https://local.storage.doxaai.com/...", "token": "..." }
-
-    # Response (failure):
-    # { "success": false, "error": { "code": "ERROR_CODE", "message": "error msg" } }
+    # Step 3: Get an upload slot
 
     try:
-        upload_slot = get_upload_slot(
-            access_token, competition, environment, user_config
-        )
+        upload_slot = get_upload_slot(session, competition, environment, user_config)
 
         base_url = DOXA_STORAGE_URL or upload_slot["endpoint"]
         if not base_url.endswith("/"):
@@ -219,8 +198,7 @@ def upload(
         os.unlink(temporary_file.name)
         raise typer.Exit(1)
 
-    # Step 4:`upload the tarfile to {endpoint} making sure to pass in the header
-    # - Authorization: Bearer {token from step 2}
+    # Step 4: upload the tarfile to {endpoint}
 
     print()
     try:
@@ -265,10 +243,14 @@ def upload(
     )
 
 
-def get_upload_slot(access_token, competition, environment, metadata):
-    result = requests.post(
+def get_upload_slot(
+    session: requests.Session,
+    competition: str,
+    environment: str | None,
+    metadata: dict[Any, Any],
+):
+    result = session.post(
         UPLOAD_SLOT_URL,
-        headers={"Authorization": f"Bearer {access_token}"},
         json={
             "competition_tag": competition,
             "environment_tag": environment,
@@ -277,18 +259,14 @@ def get_upload_slot(access_token, competition, environment, metadata):
         verify=True,
     ).json()
 
-    try:
-        assert "success" in result
-        assert "endpoint" in result
-        assert "token" in result
-        assert "error" not in result
-    except:
-        if "error" in result:
-            raise UploadSlotDeniedError(
-                result["error"].get("code"), result["error"].get("message")
-            )
+    if "error" in result:
+        raise UploadSlotDeniedError(
+            result["error"].get("code"), result["error"].get("message")
+        )
 
-        raise AssertionError
+    assert "success" in result
+    assert "endpoint" in result
+    assert "token" in result
 
     return result
 

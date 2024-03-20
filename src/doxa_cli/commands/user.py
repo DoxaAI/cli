@@ -4,18 +4,18 @@ from rich.console import Console
 from rich.table import Table
 
 from doxa_cli.constants import USER_URL
-from doxa_cli.errors import LoggedOutError, SessionExpiredError
-from doxa_cli.utils import get_access_token, show_error
+from doxa_cli.errors import SessionExpiredError, SignedOutError, show_error
+from doxa_cli.utils import get_request_client
 
 
 def user():
-    """Display DOXA account information. You must be logged in."""
+    """Display DOXA AI account information. You must be logged in."""
 
     console = Console()
 
     try:
-        access_token = get_access_token()
-    except LoggedOutError:
+        session = get_request_client(require_auth=True)
+    except SignedOutError:
         console.print(
             "\nYou must be logged in to see user information.", style="bold cyan"
         )
@@ -30,22 +30,27 @@ def user():
         raise typer.Exit(1)
 
     try:
-        data = requests.get(
-            USER_URL, headers={"Authorization": f"Bearer {access_token}"}, verify=True
-        ).json()
+        data = session.get(USER_URL, verify=True).json()
+    except requests.exceptions.JSONDecodeError:
+        show_error(
+            "Oops, the server returned an invalid response. Please try again later."
+        )
+        raise typer.Exit(1)
     except:
         show_error(
             "Oops, your user information could not be fetched at this time. You may wish to try logging in again."
         )
         raise typer.Exit(1)
 
+    username = data.get("preferred_username")
+
     console.print(
-        f"\nHello, @{data['preferred_username']}! Here are your account details:\n",
+        f"\nHello, @{username}! Here are your account details:\n",
         style="bold green",
     )
 
     table = Table(
-        title=f"User Information for @{data['preferred_username']}",
+        title=f"User Information for @{username}",
         leading=1,
         title_style="bold white",
     )
@@ -53,8 +58,8 @@ def user():
     table.add_column("Field", style="bold cyan")
     table.add_column("Value", overflow="fold")
 
-    table.add_row("Username", data["preferred_username"])
-    table.add_row("Email", data["email"])
-    table.add_row("Tag", data["sub"])
+    table.add_row("Username", username)
+    table.add_row("Email", data.get("email"))
+    table.add_row("Tag", data.get("sub"))
 
     console.print(table)

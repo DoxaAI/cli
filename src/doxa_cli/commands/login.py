@@ -7,11 +7,18 @@ import requests
 import typer
 from halo import Halo
 
+from doxa_cli.config import CONFIG
 from doxa_cli.constants import CLIENT_ID, LOGIN_URL, SCOPE, SPINNER, TOKEN_URL
-from doxa_cli.utils import show_error, update_doxa_config
+from doxa_cli.errors import show_error
+from doxa_cli.utils import get_request_client
 
 
-def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime):
+def wait_for_auth(
+    session: requests.Session,
+    device_code: str,
+    interval: int,
+    expires_at: datetime.datetime,
+):
     while True:
         now = datetime.datetime.now()
         if now >= expires_at:
@@ -19,9 +26,9 @@ def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime
             break
 
         try:
-            res = requests.post(
+            res = session.post(
                 TOKEN_URL,
-                data={
+                json={
                     "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                     "client_id": CLIENT_ID,
                     "device_code": device_code,
@@ -43,9 +50,9 @@ def wait_for_auth(device_code: str, interval: int, expires_at: datetime.datetime
             break
 
 
-def get_device_code():
-    result = requests.post(
-        LOGIN_URL, data={"client_id": CLIENT_ID, "scope": SCOPE}, verify=True
+def get_device_code(session: requests.Session):
+    result = session.post(
+        LOGIN_URL, json={"client_id": CLIENT_ID, "scope": SCOPE}, verify=True
     ).json()
 
     assert "device_code" in result
@@ -59,9 +66,10 @@ def login():
     """Log in with your DOXA AI platform account."""
 
     now = datetime.datetime.now()
+    session = get_request_client()
 
     try:
-        data = get_device_code()
+        data = get_device_code(session)
     except:
         show_error(
             "\nAn error occurred while initiating the authorisation process. Please try again later."
@@ -89,7 +97,7 @@ def login():
 
     with Halo(text="Waiting for approval", spinner=SPINNER, enabled=True) as spinner:
         for state, result in wait_for_auth(
-            data["device_code"], data["interval"], expires_at
+            session, data["device_code"], data["interval"], expires_at
         ):
             if state == "PENDING":
                 continue
@@ -104,11 +112,13 @@ def login():
                 spinner.fail("An error occurred while attempting to log you in.")
             elif state == "SUCCESS" and result is not None:
                 try:
-                    update_doxa_config(
-                        access_token=result["access_token"],
-                        refresh_token=result.get("refresh_token", None),
-                        expires_at=datetime.datetime.now()
-                        + datetime.timedelta(seconds=result["expires_in"]),
+                    CONFIG.update(
+                        {
+                            "access_token": result["access_token"],
+                            "refresh_token": result.get("refresh_token", None),
+                            "expires_at": datetime.datetime.now()
+                            + datetime.timedelta(seconds=result["expires_in"]),
+                        }
                     )
                     spinner.succeed(
                         "Authorisation successful - you have now been logged in!"

@@ -3,11 +3,12 @@ from rich.console import Console
 from rich.table import Table
 from typing_extensions import Annotated
 
+from doxa_cli.config import CONFIG
 from doxa_cli.constants import CONFIG_PATH, DOXA_BASE_URL, DOXA_STORAGE_URL, IS_DEBUG
-from doxa_cli.utils import clear_doxa_config, read_doxa_config, show_error
+from doxa_cli.errors import show_error
 
 
-def config(
+def config_info(
     debug: Annotated[
         bool,
         typer.Option(
@@ -39,11 +40,9 @@ def config(
 
     if debug or IS_DEBUG:
         try:
-            config = read_doxa_config()
-
-            table.add_row("Access Token", config.get("access_token", "None"))
-            table.add_row("Access Token Expiry", config.get("expires_at", "None"))
-            table.add_row("Refresh Token", config.get("refresh_token", "None"))
+            table.add_row("Access Token", CONFIG.get("access_token", "None"))
+            table.add_row("Access Token Expiry", CONFIG.get("expires_at", "None"))
+            table.add_row("Refresh Token", CONFIG.get("refresh_token", "None"))
         except FileNotFoundError:
             show_error("\nOops, your configuration file could not be read.")
         except:
@@ -53,14 +52,9 @@ def config(
 
     if reset:
         try:
-            clear_doxa_config()
+            CONFIG.clear()
             console.print(
                 "\nThe configuration file was deleted successfully.", style="bold green"
-            )
-        except FileNotFoundError:
-            console.log(
-                "\nThere is no configuration file at that location to delete.",
-                style="bold yellow",
             )
         except:
             show_error(

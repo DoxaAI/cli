@@ -1,6 +1,6 @@
 [project]
 name = "doxa-cli"
-version = "0.1.5"
+version = "0.1.6"
 authors = [{ name = "Jeremy Lo Ying Ping", email = "jeremy@doxaai.com" }]
 description = "The CLI for interacting with DOXA, a powerful platform for running engaging online artificial intelligence competitions."
 readme = "README.md"
@@ -16,7 +16,6 @@ dependencies = [
   "halo ~= 0.0.31, >= 0.0.31",
   "requests ~= 2.26.0",
   "requests_toolbelt ~= 0.10.1",
-  "platformdirs >= 4.0.0",
   "pyyaml >= 6.0",
 ]
 

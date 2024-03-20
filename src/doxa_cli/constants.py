@@ -1,7 +1,7 @@
 import os
-import platform
+from pathlib import Path
 
-import platformdirs
+import typer
 from rich.theme import Theme
 
 VERSION = "0.1"
@@ -10,7 +10,7 @@ IS_DEV = os.environ.get("DOXA_ENV") in ("DEV", "DEVELOPMENT")
 IS_DEBUG = IS_DEV or os.environ.get("DOXA_DEBUG") in ("true", "TRUE")
 
 DOXA_BASE_URL = os.environ.get(
-    "DOXA_BASE_URL", "http://localhost:3001" if IS_DEV else "https://api.doxaai.com"
+    "DOXA_BASE_URL", "http://localhost:4002/api" if IS_DEV else "https://api.doxaai.com"
 )
 
 DOXA_STORAGE_URL = (
@@ -29,12 +29,9 @@ SCOPE = "openid profile email agent"
 def get_config_directory():
     directory = os.environ.get("DOXA_CONFIG_DIRECTORY")
     if directory and os.path.isabs(directory):
-        return directory
+        return Path(directory)
 
-    if platform.system() == "Darwin":
-        return platformdirs.user_data_dir(appname="doxa", version=VERSION)
-
-    return platformdirs.user_config_dir(appname="doxa", version=VERSION)
+    return Path(typer.get_app_dir("doxa")) / VERSION
 
 
 CONFIG_DIRECTORY = get_config_directory()
