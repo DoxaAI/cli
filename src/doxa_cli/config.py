@@ -5,7 +5,7 @@ from typing import Any
 
 import typer
 
-from doxa_cli.constants import CONFIG_DIRECTORY, CONFIG_PATH, VERSION
+from doxa_cli.constants import CONFIG_DIRECTORY, CONFIG_PATH, __short_version__
 from doxa_cli.errors import show_error
 
 DEFAULT_PROFILE = "default"
@@ -20,13 +20,13 @@ class Config:
         self.profile = DEFAULT_PROFILE
 
     def _generate_fresh_config(self):
-        return {"version": VERSION, "profiles": {DEFAULT_PROFILE: {}}}
+        return {"version": __short_version__, "profiles": {DEFAULT_PROFILE: {}}}
 
     def _load(self) -> None:
         try:
             with open(CONFIG_PATH, "r") as f:
                 self.config = json.load(f)
-                if self.config.get("version") != VERSION:
+                if self.config.get("version") != __short_version__:
                     raise ValueError
 
                 self.profile = self.config.get("profile", DEFAULT_PROFILE)

@@ -6,6 +6,7 @@ from doxa_cli.commands.logout import logout
 from doxa_cli.commands.surprise import surprise
 from doxa_cli.commands.upload import upload
 from doxa_cli.commands.user import user
+from doxa_cli.commands.version import version
 
 main = typer.Typer(
     name="DOXA AI CLI",
@@ -16,6 +17,7 @@ main = typer.Typer(
 main.command()(login)
 main.command()(logout)
 main.command()(user)
+main.command()(version)
 
 main.command(name="config", hidden=True)(config_info)
 main.command(hidden=True)(surprise)

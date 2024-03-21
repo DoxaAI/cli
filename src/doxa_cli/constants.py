@@ -4,7 +4,9 @@ from pathlib import Path
 import typer
 from rich.theme import Theme
 
-VERSION = "0.1"
+__version_info__ = (0, 1, 7)
+__version__ = ".".join(map(str, __version_info__))
+__short_version__ = ".".join(map(str, __version_info__[:2]))
 
 IS_DEV = os.environ.get("DOXA_ENV") in ("DEV", "DEVELOPMENT")
 IS_DEBUG = IS_DEV or os.environ.get("DOXA_DEBUG") in ("true", "TRUE")
@@ -31,7 +33,7 @@ def get_config_directory():
     if directory and os.path.isabs(directory):
         return Path(directory)
 
-    return Path(typer.get_app_dir("doxa")) / VERSION
+    return Path(typer.get_app_dir("doxa")) / __short_version__
 
 
 CONFIG_DIRECTORY = get_config_directory()

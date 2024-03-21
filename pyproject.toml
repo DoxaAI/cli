@@ -1,6 +1,6 @@
 [project]
 name = "doxa-cli"
-version = "0.1.6"
+version = "0.1.7"
 authors = [{ name = "Jeremy Lo Ying Ping", email = "jeremy@doxaai.com" }]
 description = "The CLI for interacting with DOXA, a powerful platform for running engaging online artificial intelligence competitions."
 readme = "README.md"
