@@ -16,17 +16,19 @@ class SessionExpiredError(DoxaError):
 
 
 class UploadSlotDeniedError(DoxaError):
-    def __init__(self, code, message, *args: object) -> None:
+    def __init__(self, code: str, message: str | None, *args: object) -> None:
         super().__init__(*args)
         self.doxa_error_code: str = code
-        self.doxa_error_message: str = message
+        self.doxa_error_message: str = message or "An unexpected error occurred."
 
 
 class UploadError(DoxaError):
-    def __init__(self, code, message, *args: object) -> None:
+    def __init__(self, code: str, message: str | None, *args: object) -> None:
         super().__init__(*args)
         self.doxa_error_code: str = code
-        self.doxa_error_message: str = message
+        self.doxa_error_message: str = (
+            message or "An unexpected error occurred during the upload."
+        )
 
 
 def show_error(

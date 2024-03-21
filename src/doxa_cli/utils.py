@@ -13,7 +13,11 @@ from doxa_cli.errors import SessionExpiredError, SignedOutError, show_error
 def _handle_outdated_cli(r, *args, **kwargs):
     if r.status_code == requests.codes.bad_request:
         body = r.json()
-        if "error" in body and body["error"].get("code") == "CLIENT_OUTDATED":
+        if (
+            "error" in body
+            and isinstance(body["error"], dict)
+            and body["error"].get("code") == "CLIENT_OUTDATED"
+        ):
             show_error(
                 body["error"].get(
                     "message",

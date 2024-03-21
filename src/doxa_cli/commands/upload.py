@@ -145,10 +145,18 @@ def upload(
         os.unlink(temporary_file.name)
         raise typer.Exit(1)
 
+    size = os.path.getsize(temporary_file.name)
+
     # Step 3: Get an upload slot
 
     try:
-        upload_slot = get_upload_slot(session, competition, environment, user_config)
+        upload_slot = get_upload_slot(
+            session=session,
+            competition=competition,
+            environment=environment,
+            metadata=user_config,
+            size=size,
+        )
 
         base_url = DOXA_STORAGE_URL or upload_slot["endpoint"]
         if not base_url.endswith("/"):
@@ -165,6 +173,7 @@ def upload(
             "ENROLMENT_NOT_FOUND",
             "ENVIRONMENT_INVALID",
             "STORAGE_NODE_NOT_FOUND",
+            "SUBMISSION_TOO_LARGE",
             "UNKNOWN",
         ):
             first_line, *lines = e.doxa_error_message.split("\n")
@@ -202,7 +211,6 @@ def upload(
 
     print()
     try:
-        size = os.path.getsize(temporary_file.name)
         with open(temporary_file.name, "rb") as f:
             # show a fancy progress bar of the upload!
             with Progress(
@@ -221,12 +229,8 @@ def upload(
                 def callback(m):
                     progress.update(task, completed=m.bytes_read)
 
-                result = upload_agent(upload_endpoint, upload_token, f, callback)
-
-                if result.get("success", False):
-                    progress.update(task, completed=size)
-                else:
-                    raise UploadError(result.get("error_code"), result.get("message"))
+                upload_agent(upload_endpoint, upload_token, f, callback)
+                progress.update(task, completed=size)
     except UploadError as e:
         console.print(f"\n  [bold red]ERROR[white]: {e.doxa_error_message}")
         raise typer.Exit(1)
@@ -248,6 +252,7 @@ def get_upload_slot(
     competition: str,
     environment: str | None,
     metadata: dict[Any, Any],
+    size: int,
 ):
     result = session.post(
         UPLOAD_SLOT_URL,
@@ -255,6 +260,7 @@ def get_upload_slot(
             "competition_tag": competition,
             "environment_tag": environment,
             "metadata": metadata,
+            "size": size,
         },
         verify=True,
     ).json()
@@ -264,7 +270,6 @@ def get_upload_slot(
             result["error"].get("code"), result["error"].get("message")
         )
 
-    assert "success" in result
     assert "endpoint" in result
     assert "token" in result
 
@@ -322,10 +327,10 @@ def upload_agent(
     upload_token: str,
     file: typing.IO,
     callback: typing.Callable,
-):
+) -> None:
     m = MultipartEncoderMonitor(MultipartEncoder(fields={file.name: file}), callback)
 
-    result = requests.post(
+    response = requests.post(
         upload_endpoint,
         headers={
             "Authorization": f"Bearer {upload_token}",
@@ -333,6 +338,15 @@ def upload_agent(
         },
         data=m,
         verify=True,
-    ).json()
+    )
 
-    return result
+    body = response.json()
+    if response.ok and "error" not in body and "error_code" not in body:
+        return
+
+    # New response format: { "error": { "code": "ERROR_CODE", "message": "..." } }
+    if "error" in body:
+        raise UploadError(body["error"].get("code"), body["error"].get("message"))
+
+    # Other error or legacy response format: { "error_code": "ERROR_CODE", "message": "..." }
+    raise UploadError(body.get("error_code", "UNKNOWN"), body.get("message"))
