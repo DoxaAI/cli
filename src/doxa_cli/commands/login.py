@@ -43,6 +43,10 @@ def wait_for_auth(
             if res["error"] == "authorization_pending":
                 yield "PENDING", None
                 time.sleep(interval)
+            elif res["error"] == "slow_down":
+                yield "PENDING", None
+                interval += 5
+                time.sleep(interval)
             else:
                 yield "AUTH_ERROR", res["error"]
         elif "access_token" in res:
