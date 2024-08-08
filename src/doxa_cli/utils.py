@@ -6,7 +6,7 @@ import typer
 import yaml
 
 from doxa_cli.config import CONFIG
-from doxa_cli.constants import DOXA_YAML, SCOPE, TOKEN_URL, __short_version__
+from doxa_cli.constants import DOXA_YAML, SCOPE, TOKEN_URL, __version__
 from doxa_cli.errors import SessionExpiredError, SignedOutError, show_error
 
 
@@ -29,7 +29,7 @@ def _handle_outdated_cli(r, *args, **kwargs):
 
 def get_request_client(require_auth: bool = False) -> requests.Session:
     session = requests.Session()
-    session.headers.update({"User-Agent": f"DOXA-CLI/{__short_version__}"})
+    session.headers.update({"User-Agent": f"DOXA-CLI/{__version__}"})
     session.hooks["response"].append(_handle_outdated_cli)
 
     if require_auth:
