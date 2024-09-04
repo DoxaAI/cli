@@ -341,12 +341,12 @@ def upload_agent(
     )
 
     body = response.json()
-    if response.ok and "error" not in body and "error_code" not in body:
+    if response.ok and "error" not in body:
         return
 
     # New response format: { "error": { "code": "ERROR_CODE", "message": "..." } }
     if "error" in body:
         raise UploadError(body["error"].get("code"), body["error"].get("message"))
 
-    # Other error or legacy response format: { "error_code": "ERROR_CODE", "message": "..." }
-    raise UploadError(body.get("error_code", "UNKNOWN"), body.get("message"))
+    # Other error
+    raise UploadError("UNKNOWN", body.get("message"))
